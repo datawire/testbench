@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # PYTHON_ARGCOMPLETE_OK
 # SPDX-License-Identifier: LGPL-2.1+
 

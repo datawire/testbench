@@ -3,7 +3,7 @@
 /.mkosi-*
 /SHA256SUMS
 /SHA256SUMS.gpg
-/__pycache__
+__pycache__/
 /build
 /dist
 /image
