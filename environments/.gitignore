@@ -1,2 +1,2 @@
-*.osi
 *.mk
+*.extra/root/.kube/config

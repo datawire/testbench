@@ -1,1 +1,5 @@
 .mkosi*/
+
+*.osi
+*.knaut
+*.knaut.claim

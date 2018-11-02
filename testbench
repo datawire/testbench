@@ -1,4 +1,4 @@
-#!/usr/bin/make -f
+#!/usr/bin/make -rRf
 
 KUBERNAUT ?= kubernaut
 MKOSI ?= sudo mkosi --cache /var/cache/pacman/pkg/
@@ -17,7 +17,7 @@ all: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 
 # Use kubernaut to manage test clusters
 %.knaut.claim:
-	echo $*-$${USER}-$$(uuidgen) > $@
+	echo $(subst /,_,$*)-$${USER}-$$(uuidgen) > $@
 %.knaut: %.knaut.claim
 	$(KUBERNAUT) claims delete "$$(cat $<)"
 	$(KUBERNAUT) claims create --name "$$(cat $<)" --cluster-group main >/dev/null
@@ -27,13 +27,15 @@ all: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 	[ ! -e $*.knaut.claim ] || $(KUBERNAUT) claims delete "$$(cat $*.knaut.claim)"
 	rm -f -- $*.knaut $*.knaut.claim
 
-# Actually start
+# Generic mkosi rules
 %.mk: %.mkosi FORCE
-	@echo '$$(info loading $@)' *.raw: $(wildcard $*.postinst $*.extra) | ./write-ifchanged $@
--include *.mk
-%.osi: %.mkosi %.mk
+	@echo $*.osi: $(sort $(shell find $(wildcard $*.mkosi $*.postinst $*.extra))) | ./write-ifchanged $@
+-include environments/*.mk
+%.osi: %.mkosi %.mk %.extra/root/.kube/config
 	$(MKOSI) --force \
 	  --output $@ \
 	  --default $*.mkosi \
 	  $(if $(wildcard $*.postinst),--postinst-script $*.postinst) \
 	  $(if $(wildcard $*.extra),--extra-tree $*.extra)
+%.extra/root/.kube/config: %.knaut
+	install -Dm644 $< $@
