@@ -2005,7 +2005,7 @@ def insert_partition(args, workspace, raw, loopdev, partno, blob, name, type_uui
         last_partition_sector = GPT_HEADER_SIZE
 
     blob_size = roundup512(os.stat(blob.name).st_size)
-    luks_extra = 2*1024*1024 if args.encrypt == "all" else 0
+    luks_extra = 2*1024*1024 if args.encrypt == "all" else 0  # 2MB else 0
     new_size = last_partition_sector + blob_size + luks_extra + GPT_FOOTER_SIZE
 
     print_step("Resizing disk image to {}...".format(format_bytes(new_size)))
@@ -3225,13 +3225,13 @@ def load_args() -> CommandLineArguments:
     args.swap_size = parse_bytes(args.swap_size)
 
     if args.output_format in (OutputFormat.raw_ext4, OutputFormat.raw_btrfs) and args.root_size is None:
-        args.root_size = 1024*1024*1024
+        args.root_size = 1024*1024*1024  # 1GiB
 
     if args.output_format == OutputFormat.raw_xfs and args.root_size is None:
-        args.root_size = 1300*1024*1024
+        args.root_size = 1300*1024*1024  # 1.27GiB
 
     if args.bootable and args.esp_size is None:
-        args.esp_size = 256*1024*1024
+        args.esp_size = 256*1024*1024  # 256MiB
 
     args.verity_size = None
 
