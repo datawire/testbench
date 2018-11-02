@@ -3,10 +3,10 @@
 
 import sys
 
+from setuptools import find_packages, setup
+
 if sys.version_info < (3, 5):
     sys.exit("Sorry, we need at least Python 3.5.")
-
-from setuptools import setup, find_packages
 
 setup(
     name="mkosi",

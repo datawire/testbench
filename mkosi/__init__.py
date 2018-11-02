@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: LGPL-2.1+
 
 import argparse
+import collections
 import configparser
 import contextlib
-import collections
 import crypt
-import ctypes, ctypes.util
+import ctypes
+import ctypes.util
 import errno
 import fcntl
 import getpass
@@ -23,20 +24,19 @@ import sys
 import tempfile
 import urllib.request
 import uuid
-
+from enum import Enum
+from subprocess import DEVNULL, PIPE, run
 from typing import (
-    Any,
-    Dict,
-    Callable,
-    Generator,
     IO,
+    Any,
+    Callable,
+    Dict,
     Iterable,
     Iterator,
     List,
     NoReturn,
     Optional,
     Tuple,
-    Union,
 )
 
 try:
@@ -44,8 +44,6 @@ try:
 except ImportError:
     pass
 
-from enum import Enum
-from subprocess import run, DEVNULL, PIPE
 
 __version__ = '4'
 
@@ -75,7 +73,7 @@ class CommandLineArguments(argparse.Namespace):
 
 class OutputFormat(Enum):
     raw_ext4 = 1
-    raw_gpt = 1 # Kept for backwards compatibility
+    raw_gpt = 1  # Kept for backwards compatibility
     raw_btrfs = 2
     raw_squashfs = 3
     directory = 4
@@ -188,10 +186,10 @@ def mkdir_last(path: str, mode: int=0o777) -> str:
             raise
     return path
 
-_IOC_NRBITS   =  8
-_IOC_TYPEBITS =  8
+_IOC_NRBITS   = 8
+_IOC_TYPEBITS = 8
 _IOC_SIZEBITS = 14
-_IOC_DIRBITS  =  2
+_IOC_DIRBITS  = 2
 
 _IOC_NRSHIFT   = 0
 _IOC_TYPESHIFT = _IOC_NRSHIFT + _IOC_NRBITS
@@ -203,7 +201,7 @@ _IOC_WRITE = 1
 _IOC_READ  = 2
 
 def _IOC(dir: int, type: int, nr: int, argtype: str) -> int:
-    size = {'int':4, 'size_t':8}[argtype]
+    size = {'int': 4, 'size_t': 8}[argtype]
     return dir<<_IOC_DIRSHIFT | type<<_IOC_TYPESHIFT | nr<<_IOC_NRSHIFT | size<<_IOC_SIZESHIFT
 
 
@@ -296,7 +294,7 @@ def copy(oldpath: str, newpath: str) -> None:
 @contextlib.contextmanager
 def complete_step(text: str, text2: Optional[str]=None) -> Iterator[List[Any]]:
     print_step(text + '...')
-    args = [] # type: List[Any]
+    args = []  # type: List[Any]
     yield args
     if text2 is None:
         text2 = text + ' complete'
@@ -345,7 +343,7 @@ def btrfs_subvol_delete(path: str) -> None:
     # Delete the subvolume now that all its descendants have been deleted
     run(["btrfs", "subvol", "delete", path], stdout=DEVNULL, stderr=DEVNULL, check=True)
 
-def btrfs_subvol_make_ro(path: str, b:bool=True) -> None:
+def btrfs_subvol_make_ro(path: str, b: bool=True) -> None:
     run(["btrfs", "property", "set", path, "ro", "true" if b else "false"], check=True)
 
 def image_size(args: CommandLineArguments) -> int:
@@ -476,7 +474,7 @@ def reuse_cache_image(args: CommandLineArguments, workspace: str, run_build_scri
             return None, False
 
         with source:
-            f = tempfile.NamedTemporaryFile(dir = os.path.dirname(args.output), prefix='.mkosi-')
+            f = tempfile.NamedTemporaryFile(dir=os.path.dirname(args.output), prefix='.mkosi-')
             output.append(f)
 
             # So on one hand we want CoW off, since this stuff will
@@ -621,7 +619,7 @@ def luks_format_srv(args: CommandLineArguments, loopdev: str, run_build_script: 
     with complete_step("LUKS formatting server data partition"):
         luks_format(partition(loopdev, args.srv_partno), args.passphrase)
 
-def luks_setup_root(args: CommandLineArguments, loopdev: str, run_build_script: bool, inserting_squashfs:bool=False) -> Optional[str]:
+def luks_setup_root(args: CommandLineArguments, loopdev: str, run_build_script: bool, inserting_squashfs: bool=False) -> Optional[str]:
 
     if args.encrypt != "all":
         return None
@@ -717,7 +715,7 @@ def prepare_srv(args: CommandLineArguments, dev: str, cached: bool) -> None:
     with complete_step('Formatting server data partition'):
         mkfs_ext4("srv", "/srv", dev)
 
-def mount_loop(args: CommandLineArguments, dev: str, where: str, read_only:bool=False) -> None:
+def mount_loop(args: CommandLineArguments, dev: str, where: str, read_only: bool=False) -> None:
     os.makedirs(where, 0o755, True)
 
     options = "-odiscard"
@@ -943,7 +941,7 @@ def run_workspace_command(args: CommandLineArguments, workspace: str, *cmd: str,
     else:
         cmdline += ["--private-network"]
 
-    cmdline += [ "--setenv={}={}".format(k,v) for k,v in env.items() ]
+    cmdline += [ "--setenv={}={}".format(k, v) for k, v in env.items() ]
 
     if nspawn_params:
         cmdline += nspawn_params
@@ -1014,9 +1012,9 @@ def invoke_dnf(args: CommandLineArguments, workspace: str, repositories: List[st
         cmdline.append("--setopt=tsflags=nodocs")
 
     cmdline.extend([
-               "install",
-               *base_packages
-               ])
+        "install",
+        *base_packages
+    ])
 
     cmdline.extend(args.packages)
 
@@ -1226,9 +1224,9 @@ def invoke_yum(args: CommandLineArguments, workspace: str, repositories: List[st
         cmdline.append("--setopt=tsflags=nodocs")
 
     cmdline.extend([
-               "install",
-               *base_packages
-               ])
+        "install",
+        *base_packages
+    ])
 
     cmdline.extend(args.packages)
 
@@ -1754,7 +1752,7 @@ def install_boot_loader_debian(args, workspace):
     kernel_version = next(filter(lambda x: x[0].isdigit(), os.listdir(os.path.join(workspace, "root", "lib/modules"))))
 
     run_workspace_command(args, workspace,
-                    "/usr/bin/kernel-install", "add", kernel_version, "/boot/vmlinuz-" + kernel_version)
+                          "/usr/bin/kernel-install", "add", kernel_version, "/boot/vmlinuz-" + kernel_version)
 
 def install_boot_loader_ubuntu(args, workspace):
     install_boot_loader_debian(args, workspace)
@@ -1968,7 +1966,7 @@ def read_partition_table(loopdev):
     for line in c.stdout.decode("utf-8").split('\n'):
         stripped = line.strip()
 
-        if stripped == "": # empty line is where the body begins
+        if stripped == "":  # empty line is where the body begins
             in_body = True
             continue
         if not in_body:
@@ -1997,7 +1995,7 @@ def read_partition_table(loopdev):
 
     return table, last_sector * 512
 
-def insert_partition(args, workspace, raw, loopdev, partno, blob, name, type_uuid, uuid = None):
+def insert_partition(args, workspace, raw, loopdev, partno, blob, name, type_uuid, uuid=None):
 
     if args.ran_sfdisk:
         old_table, last_partition_sector = read_partition_table(loopdev)
@@ -2169,7 +2167,7 @@ def install_unified_kernel(args, workspace, run_build_script, for_cache, root_ha
 
             dracut += [ boot_binary ]
 
-            run_workspace_command(args, workspace, *dracut);
+            run_workspace_command(args, workspace, *dracut)
 
 def secure_boot_sign(args, workspace, run_build_script, for_cache):
 
@@ -2739,7 +2737,7 @@ def process_setting(args: CommandLineArguments, section: str, key: str, value: A
         elif key == "Encrypt":
             if args.encrypt is None:
                 if value not in ("all", "data"):
-                    raise ValueError("Invalid encryption setting: "+ value)
+                    raise ValueError("Invalid encryption setting: " + value)
                 args.encrypt = value
         elif key == "Verity":
             if args.verity is None:
@@ -3565,7 +3563,7 @@ def need_cache_images(args: CommandLineArguments) -> bool:
 
     return not os.path.exists(args.cache_pre_dev) or not os.path.exists(args.cache_pre_inst)
 
-def remove_artifacts(args: CommandLineArguments, workspace: str, raw: Optional[IO[str]], tar: Optional[IO[str]], run_build_script: bool, for_cache:bool=False) -> None:
+def remove_artifacts(args: CommandLineArguments, workspace: str, raw: Optional[IO[str]], tar: Optional[IO[str]], run_build_script: bool, for_cache: bool=False) -> None:
 
     if for_cache:
         what = "cache build"
@@ -3689,8 +3687,8 @@ def run_qemu(args: CommandLineArguments) -> None:
                     ['qemu', '-machine', 'accel=kvm'],
                     ['qemu-kvm']):
 
-           if cmdline[0] and shutil.which(cmdline[0]):
-               break
+        if cmdline[0] and shutil.which(cmdline[0]):
+            break
     else:
         die("Couldn't find QEMU/KVM binary")
 
