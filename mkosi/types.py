@@ -20,13 +20,3 @@ RAW_RW_FS_FORMATS = (
 )
 
 RAW_FORMATS = (*RAW_RW_FS_FORMATS, OutputFormat.raw_squashfs)
-
-class Distribution(Enum):
-    fedora = 1
-    debian = 2
-    ubuntu = 3
-    arch = 4
-    opensuse = 5
-    mageia = 6
-    centos = 7
-    clear = 8

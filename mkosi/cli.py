@@ -5,13 +5,13 @@ import argparse
 import configparser
 import getpass
 import os
-import platform
 import re
 import string
 import sys
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-from .types import RAW_FORMATS, Distribution, OutputFormat
+from . import distros
+from .types import RAW_FORMATS, OutputFormat
 from .ui import die, warn
 
 try:
@@ -52,7 +52,7 @@ def parse_args() -> CommandLineArguments:
     group.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 
     group = parser.add_argument_group("Distribution")
-    group.add_argument('-d', "--distribution", choices=Distribution.__members__, help='Distribution to install')
+    group.add_argument('-d', "--distribution", choices=distros.list_distros(), help='Distribution to install')
     group.add_argument('-r', "--release", help='Distribution release to install')
     group.add_argument('-m', "--mirror", help='Distribution mirror to use')
     group.add_argument("--repositories", action=CommaDelimitedListAction, dest='repositories', help='Repositories to use', metavar='REPOS')
@@ -155,7 +155,7 @@ def parse_bytes(bytes: Optional[str]) -> Optional[int]:
 
     return result
 
-def detect_distribution() -> Tuple[Optional[Distribution], Optional[str]]:
+def detect_distribution() -> Tuple[Optional[str], Optional[str]]:
     try:
         f = open("/etc/os-release")
     except IOError:
@@ -185,14 +185,14 @@ def detect_distribution() -> Tuple[Optional[Distribution], Optional[str]]:
             if len(codename_list) == 1:
                 extracted_codename = codename_list[0]
 
-    if id == "clear-linux-os":
+    if id == "clear-linux-os":  # FIXME: don't hard-code distro-specific details
         id = "clear"
 
-    d: Optional[Distribution] = None
-    if id is not None:
-        d = Distribution.__members__.get(id, None)
+    d: Optional[str] = None
+    if id is not None and id in distros.list_distros():
+        d = id
 
-    if d == Distribution.debian and (version_codename or extracted_codename):
+    if d == 'debian' and (version_codename or extracted_codename):  # FIXME: don't hard-code distro-specific details
         # debootstrap needs release codenames, not version numbers
         if version_codename:
             version_id = version_codename
@@ -454,11 +454,11 @@ def find_cache(args: CommandLineArguments) -> None:
         return
 
     if os.path.exists("mkosi.cache/"):
-        args.cache_path = "mkosi.cache/" + args.distribution.name
+        args.cache_path = "mkosi.cache/" + args.distribution
 
         # Clear has a release number that can be used, however the
         # cache is valid (and more efficient) across releases.
-        if args.distribution != Distribution.clear and args.release is not None:
+        if args.distribution != 'clear' and args.release is not None:  # FIXME: don't hard-code distro-specific details
             args.cache_path += "~" + args.release
 
 def find_build_script(args: CommandLineArguments) -> None:
@@ -602,54 +602,25 @@ def load_args() -> CommandLineArguments:
     else:
         args.output_format = OutputFormat[args.output_format]
 
-    if args.distribution is not None:
-        args.distribution = Distribution[args.distribution]
-
     if args.distribution is None or args.release is None:
         d, r = detect_distribution()
 
         if args.distribution is None:
             args.distribution = d
 
-        if args.distribution == d and d != Distribution.clear and args.release is None:
+        if args.distribution == d and d != 'clear' and args.release is None:  # FIXME: don't hard-code distro-specific details
             args.release = r
 
     if args.distribution is None:
         die("Couldn't detect distribution.")
 
     if args.release is None:
-        if args.distribution == Distribution.fedora:
-            args.release = "29"
-        elif args.distribution == Distribution.centos:
-            args.release = "7"
-        elif args.distribution == Distribution.mageia:
-            args.release = "6"
-        elif args.distribution == Distribution.debian:
-            args.release = "unstable"
-        elif args.distribution == Distribution.ubuntu:
-            args.release = "artful"
-        elif args.distribution == Distribution.opensuse:
-            args.release = "tumbleweed"
-        elif args.distribution == Distribution.clear:
-            args.release = "latest"
+        args.release = distros.get_distro(args.distribution).DEFAULT_RELEASE
 
     find_cache(args)
 
     if args.mirror is None:
-        if args.distribution in (Distribution.fedora, Distribution.centos):
-            args.mirror = None
-        elif args.distribution == Distribution.debian:
-            args.mirror = "http://deb.debian.org/debian"
-        elif args.distribution == Distribution.ubuntu:
-            args.mirror = "http://archive.ubuntu.com/ubuntu"
-            if platform.machine() == "aarch64":
-                args.mirror = "http://ports.ubuntu.com/"
-        elif args.distribution == Distribution.arch:
-            args.mirror = "https://mirrors.kernel.org/archlinux"
-            if platform.machine() == "aarch64":
-                args.mirror = "http://mirror.archlinuxarm.org"
-        elif args.distribution == Distribution.opensuse:
-            args.mirror = "http://download.opensuse.org"
+        args.mirror = distros.get_distro(args.distribution).DEFAULT_MIRROR
 
     if args.bootable:
         if args.output_format in (OutputFormat.directory, OutputFormat.subvolume, OutputFormat.tar):
