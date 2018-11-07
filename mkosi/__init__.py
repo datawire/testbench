@@ -690,7 +690,7 @@ def luks_setup_all(args: CommandLineArguments, loopdev: str, run_build_script: b
     finally:
         luks_close(root, "Closing LUKS root partition")
 
-def prepare_root(args: CommandLineArguments, dev: str, cached: bool) -> None:
+def prepare_root(args: CommandLineArguments, dev: Optional[str], cached: bool) -> None:
     if dev is None:
         return
     if args.output_format == OutputFormat.raw_squashfs:
@@ -706,7 +706,7 @@ def prepare_root(args: CommandLineArguments, dev: str, cached: bool) -> None:
         else:
             mkfs_ext4("root", "/", dev)
 
-def prepare_home(args: CommandLineArguments, dev: str, cached: bool) -> None:
+def prepare_home(args: CommandLineArguments, dev: Optional[str], cached: bool) -> None:
     if dev is None:
         return
     if cached:
@@ -715,7 +715,7 @@ def prepare_home(args: CommandLineArguments, dev: str, cached: bool) -> None:
     with complete_step('Formatting home partition'):
         mkfs_ext4("home", "/home", dev)
 
-def prepare_srv(args: CommandLineArguments, dev: str, cached: bool) -> None:
+def prepare_srv(args: CommandLineArguments, dev: Optional[str], cached: bool) -> None:
     if dev is None:
         return
     if cached:
@@ -747,7 +747,7 @@ def mount_tmpfs(where: str) -> None:
     run(["mount", "tmpfs", "-t", "tmpfs", where], check=True)
 
 @contextlib.contextmanager
-def mount_image(args: CommandLineArguments, workspace: str, loopdev: str, root_dev: str, home_dev: str, srv_dev: str, root_read_only: bool=False) -> Iterator[None]:
+def mount_image(args: CommandLineArguments, workspace: str, loopdev: str, root_dev: Optional[str], home_dev: Optional[str], srv_dev: Optional[str], root_read_only: bool=False) -> Iterator[None]:
     if loopdev is None:
         yield None
         return
@@ -2332,7 +2332,7 @@ def calculate_bmap(args: CommandLineArguments, raw: BinaryIO) -> Optional[TextIO
 
     return f
 
-def save_cache(args: CommandLineArguments, workspace: str, raw: str, cache_path: str) -> None:
+def save_cache(args: CommandLineArguments, workspace: str, raw: Optional[str], cache_path: str) -> None:
 
     if cache_path is None or raw is None:
         return
@@ -2346,19 +2346,21 @@ def save_cache(args: CommandLineArguments, workspace: str, raw: str, cache_path:
         else:
             shutil.move(os.path.join(workspace, "root"), cache_path)
 
-def link_output(args: CommandLineArguments, workspace: str, raw: str, tar: str) -> None:
+def link_output(args: CommandLineArguments, workspace: str, raw: Optional[str], tar: Optional[str]) -> None:
     with complete_step('Linking image file',
                        'Successfully linked ' + args.output):
         if args.output_format in (OutputFormat.directory, OutputFormat.subvolume):
             os.rename(os.path.join(workspace, "root"), args.output)
         elif args.output_format in RAW_FORMATS:
+            assert raw is not None
             os.chmod(raw, 0o666 & ~args.original_umask)
             os.link(raw, args.output)
         else:
+            assert tar is not None
             os.chmod(tar, 0o666 & ~args.original_umask)
             os.link(tar, args.output)
 
-def link_output_nspawn_settings(args: CommandLineArguments, path: str) -> None:
+def link_output_nspawn_settings(args: CommandLineArguments, path: Optional[str]) -> None:
     if path is None:
         return
 
@@ -2367,7 +2369,7 @@ def link_output_nspawn_settings(args: CommandLineArguments, path: str) -> None:
         os.chmod(path, 0o666 & ~args.original_umask)
         os.link(path, args.output_nspawn_settings)
 
-def link_output_checksum(args: CommandLineArguments, checksum: str) -> None:
+def link_output_checksum(args: CommandLineArguments, checksum: Optional[str]) -> None:
     if checksum is None:
         return
 
@@ -2376,7 +2378,7 @@ def link_output_checksum(args: CommandLineArguments, checksum: str) -> None:
         os.chmod(checksum, 0o666 & ~args.original_umask)
         os.link(checksum, args.output_checksum)
 
-def link_output_root_hash_file(args: CommandLineArguments, root_hash_file: str) -> None:
+def link_output_root_hash_file(args: CommandLineArguments, root_hash_file: Optional[str]) -> None:
     if root_hash_file is None:
         return
 
@@ -2385,7 +2387,7 @@ def link_output_root_hash_file(args: CommandLineArguments, root_hash_file: str) 
         os.chmod(root_hash_file, 0o666 & ~args.original_umask)
         os.link(root_hash_file, args.output_root_hash_file)
 
-def link_output_signature(args: CommandLineArguments, signature: str) -> None:
+def link_output_signature(args: CommandLineArguments, signature: Optional[str]) -> None:
     if signature is None:
         return
 
@@ -2394,7 +2396,7 @@ def link_output_signature(args: CommandLineArguments, signature: str) -> None:
         os.chmod(signature, 0o666 & ~args.original_umask)
         os.link(signature, args.output_signature)
 
-def link_output_bmap(args: CommandLineArguments, bmap: str) -> None:
+def link_output_bmap(args: CommandLineArguments, bmap: Optional[str]) -> None:
     if bmap is None:
         return
 
@@ -2694,7 +2696,7 @@ def parse_boolean(s: str) -> bool:
 
     raise ValueError("Invalid literal for bool(): {!r}".format(s))
 
-def process_setting(args: CommandLineArguments, section: str, key: str, value: Any) -> bool:
+def process_setting(args: CommandLineArguments, section: str, key: Optional[str], value: Any) -> bool:
     if section == "Distribution":
         if key == "Distribution":
             if args.distribution is None:
@@ -3520,7 +3522,7 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
 def var_tmp(workspace: str) -> str:
     return mkdir_last(os.path.join(workspace, "var-tmp"))
 
-def run_build_script(args: CommandLineArguments, workspace: str, raw: BinaryIO) -> None:
+def run_build_script(args: CommandLineArguments, workspace: str, raw: Optional[BinaryIO]) -> None:
     if args.build_script is None:
         return
 
