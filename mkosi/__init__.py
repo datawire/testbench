@@ -515,7 +515,13 @@ def attach_image_loopback(args: CommandLineArguments, raw: Optional[BinaryIO]) -
         with complete_step('Detaching image file'):
             run(["losetup", "--detach", loopdev], check=True)
 
-def partition(loopdev: str, partno: int) -> str:
+def partition(loopdev: str, partno: Optional[int]) -> Optional[str]:
+    if partno is None:
+        return None
+
+    return ensured_partition(loopdev, partno)
+
+def ensured_partition(loopdev: str, partno: int) -> str:
     return loopdev + "p" + str(partno)
 
 def prepare_swap(args: CommandLineArguments, loopdev: Optional[str], cached: bool) -> None:
@@ -527,7 +533,7 @@ def prepare_swap(args: CommandLineArguments, loopdev: Optional[str], cached: boo
         return
 
     with complete_step('Formatting swap partition'):
-        run(["mkswap", "-Lswap", partition(loopdev, args.swap_partno)], check=True)
+        run(["mkswap", "-Lswap", ensured_partition(loopdev, args.swap_partno)], check=True)
 
 def prepare_esp(args: CommandLineArguments, loopdev: Optional[str], cached: bool) -> None:
     if loopdev is None:
@@ -538,7 +544,7 @@ def prepare_esp(args: CommandLineArguments, loopdev: Optional[str], cached: bool
         return
 
     with complete_step('Formatting ESP partition'):
-        run(["mkfs.fat", "-nEFI", "-F32", partition(loopdev, args.esp_partno)], check=True)
+        run(["mkfs.fat", "-nEFI", "-F32", ensured_partition(loopdev, args.esp_partno)], check=True)
 
 def mkfs_ext4(label: str, mount: str, dev: str) -> None:
     run(["mkfs.ext4", "-L", label, "-M", mount, dev], check=True)
@@ -592,7 +598,7 @@ def luks_format_root(args: CommandLineArguments, loopdev: str, run_build_script:
         return
 
     with complete_step("LUKS formatting root partition"):
-        luks_format(partition(loopdev, args.root_partno), args.passphrase)
+        luks_format(ensured_partition(loopdev, args.root_partno), args.passphrase)
 
 def luks_format_home(args: CommandLineArguments, loopdev: str, run_build_script: bool, cached: bool) -> None:
 
@@ -606,7 +612,7 @@ def luks_format_home(args: CommandLineArguments, loopdev: str, run_build_script:
         return
 
     with complete_step("LUKS formatting home partition"):
-        luks_format(partition(loopdev, args.home_partno), args.passphrase)
+        luks_format(ensured_partition(loopdev, args.home_partno), args.passphrase)
 
 def luks_format_srv(args: CommandLineArguments, loopdev: str, run_build_script: bool, cached: bool) -> None:
 
@@ -620,7 +626,7 @@ def luks_format_srv(args: CommandLineArguments, loopdev: str, run_build_script: 
         return
 
     with complete_step("LUKS formatting server data partition"):
-        luks_format(partition(loopdev, args.srv_partno), args.passphrase)
+        luks_format(ensured_partition(loopdev, args.srv_partno), args.passphrase)
 
 def luks_setup_root(args: CommandLineArguments, loopdev: str, run_build_script: bool, inserting_squashfs: bool=False) -> Optional[str]:
 
@@ -634,7 +640,7 @@ def luks_setup_root(args: CommandLineArguments, loopdev: str, run_build_script: 
         return None
 
     with complete_step("Opening LUKS root partition"):
-        return luks_open(partition(loopdev, args.root_partno), args.passphrase)
+        return luks_open(ensured_partition(loopdev, args.root_partno), args.passphrase)
 
 def luks_setup_home(args: CommandLineArguments, loopdev: str, run_build_script: bool) -> Optional[str]:
 
@@ -646,7 +652,7 @@ def luks_setup_home(args: CommandLineArguments, loopdev: str, run_build_script: 
         return None
 
     with complete_step("Opening LUKS home partition"):
-        return luks_open(partition(loopdev, args.home_partno), args.passphrase)
+        return luks_open(ensured_partition(loopdev, args.home_partno), args.passphrase)
 
 def luks_setup_srv(args: CommandLineArguments, loopdev: str, run_build_script: bool) -> Optional[str]:
 
@@ -658,7 +664,7 @@ def luks_setup_srv(args: CommandLineArguments, loopdev: str, run_build_script: b
         return None
 
     with complete_step("Opening LUKS server data partition"):
-        return luks_open(partition(loopdev, args.srv_partno), args.passphrase)
+        return luks_open(ensured_partition(loopdev, args.srv_partno), args.passphrase)
 
 @contextlib.contextmanager
 def luks_setup_all(args: CommandLineArguments, loopdev: str, run_build_script: bool) -> Iterator[Tuple[Optional[str], Optional[str], Optional[str]]]:
@@ -759,7 +765,7 @@ def mount_image(args: CommandLineArguments, workspace: str, loopdev: str, root_d
             mount_loop(args, srv_dev, os.path.join(root, "srv"))
 
         if args.esp_partno is not None:
-            mount_loop(args, partition(loopdev, args.esp_partno), os.path.join(root, "efi"))
+            mount_loop(args, ensured_partition(loopdev, args.esp_partno), os.path.join(root, "efi"))
 
         # Make sure /tmp and /run are not part of the image
         mount_tmpfs(os.path.join(root, "run"))
@@ -1769,13 +1775,16 @@ def install_boot_loader_clear(args: CommandLineArguments, workspace: str, loopde
         # figure out uuid and related parameters.
         "--bind-ro=/dev",
         "--property=DeviceAllow=" + loopdev,
-        "--property=DeviceAllow=" + partition(loopdev, args.esp_partno),
-        "--property=DeviceAllow=" + partition(loopdev, args.root_partno),
 
         # clr-boot-manager compiled in Clear Linux will assume EFI
         # partition is mounted in "/boot".
         "--bind=" + os.path.join(workspace, "root/efi") + ":/boot",
     ]
+    if args.esp_partno is not None:
+        nspawn_params += ["--property=DeviceAllow=" + ensured_partition(loopdev, args.esp_partno)]
+    if args.root_partno is not None:
+        nspawn_params += ["--property=DeviceAllow=" + ensured_partition(loopdev, args.root_partno)]
+
     run_workspace_command(args, workspace, "/usr/bin/clr-boot-manager", "update", "-i", nspawn_params=nspawn_params)
 
 def install_boot_loader(args: CommandLineArguments, workspace: str, loopdev: str, cached: bool) -> None:
@@ -2042,7 +2051,7 @@ def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, pa
         dev = None
 
     try:
-        run(["dd", "if=" + blob.name, "of=" + (dev if dev is not None else partition(loopdev, partno))], check=True)
+        run(["dd", "if=" + blob.name, "of=" + (dev if dev is not None else ensured_partition(loopdev, partno))], check=True)
     finally:
         luks_close(dev, "Closing LUKS root partition")
 
