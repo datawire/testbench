@@ -1854,6 +1854,15 @@ def run_qemu(args: CommandLineArguments) -> None:
 
     os.execvp(cmdline[0], cmdline)
 
+def run_withmount(args: CommandLineArguments) -> None:
+    determine_partition_table(args)
+    workspace = setup_workspace(args)
+    with open(args.output, 'rb') as raw:
+        with attach_image_loopback(args, raw) as loopdev:
+            with luks_setup_all(args, loopdev, False) as (encrypted_root, encrypted_home, encrypted_srv):
+                with mount_image(args, workspace.name, loopdev, encrypted_root, encrypted_home, encrypted_srv):
+                    run(args.cmdline, cwd=os.path.join(workspace.name, "root"), check=True)
+
 def prepend_to_environ_path(paths: List[str]) -> None:
     if not paths:
         return
@@ -1876,16 +1885,17 @@ def main() -> None:
     if args.verb == "build":
         check_output(args)
 
-    needs_build = args.verb == "build" or (not os.path.exists(args.output) and args.verb in ("shell", "boot", "qemu"))
+    needs_build = args.verb == "build" or (not os.path.exists(args.output) and args.verb in ("shell", "boot", "qemu", "withmount"))
 
     if args.verb == "summary" or needs_build:
         print_summary(args)
 
     prepend_to_environ_path(args.extra_search_paths)
 
-    if needs_build:
+    if needs_build or args.verb == "withmount":
         check_root()
         init_namespace(args)
+    if needs_build:
         build_stuff(args)
         print_output_size(args)
 
@@ -1894,6 +1904,9 @@ def main() -> None:
 
     if args.verb == "qemu":
         run_qemu(args)
+
+    if args.verb == "withmount":
+        run_withmount(args)
 
 if __name__ == "__main__":
     main()

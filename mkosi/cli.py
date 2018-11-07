@@ -25,6 +25,7 @@ __version__ = '4'
 class CommandLineArguments(argparse.Namespace):
     """Type-hinted storage for command line arguments."""
 
+    output: str
     swap_partno: Optional[int] = None
     esp_partno: Optional[int] = None
 
@@ -46,8 +47,8 @@ def parse_args() -> CommandLineArguments:
     parser = argparse.ArgumentParser(description='Build Legacy-Free OS Images', add_help=False)
 
     group = parser.add_argument_group("Commands")
-    group.add_argument("verb", choices=("build", "clean", "help", "summary", "shell", "boot", "qemu"), nargs='?', default="build", help='Operation to execute')
-    group.add_argument("cmdline", nargs=argparse.REMAINDER, help="The command line to use for 'shell', 'boot', 'qemu'")
+    group.add_argument("verb", choices=("build", "clean", "help", "summary", "shell", "boot", "qemu", "withmount"), nargs='?', default="build", help='Operation to execute')
+    group.add_argument("cmdline", nargs=argparse.REMAINDER, help="The command line to use for 'shell', 'boot', 'qemu', 'withmount'")
     group.add_argument('-h', '--help', action='help', help="Show this help")
     group.add_argument('--version', action='version', version='%(prog)s ' + __version__)
 
@@ -592,8 +593,8 @@ def load_args() -> CommandLineArguments:
 
     args.extra_search_paths = expand_paths(args.extra_search_paths)
 
-    if args.cmdline and args.verb not in ('shell', 'boot', 'qemu'):
-        die("Additional parameters only accepted for 'shell', 'boot', 'qemu' invocations.")
+    if args.cmdline and args.verb not in ('shell', 'boot', 'qemu', 'withmount'):
+        die("Additional parameters only accepted for 'shell', 'boot', 'qemu', 'withmount' invocations.")
 
     args.force = args.force_count > 0
 
