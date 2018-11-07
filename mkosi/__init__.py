@@ -1647,7 +1647,7 @@ def install_distribution(args, workspace, run_build_script, cached):
 
     install[args.distribution](args, workspace, run_build_script)
 
-def reset_machine_id(args, workspace, run_build_script, for_cache):
+def reset_machine_id(workspace, run_build_script, for_cache):
     """Make /etc/machine-id an empty file.
 
     This way, on the next boot is either initialized and committed (if /etc is
@@ -1675,7 +1675,7 @@ def reset_machine_id(args, workspace, run_build_script, for_cache):
         else:
             os.symlink('../../../etc/machine-id', dbus_machine_id)
 
-def reset_random_seed(args, workspace):
+def reset_random_seed(workspace):
     """Remove random seed file, so that it is initialized on first boot"""
 
     with complete_step('Removing random seed'):
@@ -1997,7 +1997,7 @@ def read_partition_table(loopdev):
 
     return table, last_sector * 512
 
-def insert_partition(args, workspace, raw, loopdev, partno, blob, name, type_uuid, uuid=None):
+def insert_partition(args, raw, loopdev, partno, blob, name, type_uuid, uuid=None):
 
     if args.ran_sfdisk:
         old_table, last_partition_sector = read_partition_table(loopdev)
@@ -2049,17 +2049,17 @@ def insert_partition(args, workspace, raw, loopdev, partno, blob, name, type_uui
 
     return blob_size
 
-def insert_squashfs(args, workspace, raw, loopdev, squashfs, for_cache):
+def insert_squashfs(args, raw, loopdev, squashfs, for_cache):
     if args.output_format != OutputFormat.raw_squashfs:
         return
     if for_cache:
         return
 
     with complete_step('Inserting squashfs root partition'):
-        args.root_size = insert_partition(args, workspace, raw, loopdev, args.root_partno, squashfs,
+        args.root_size = insert_partition(args, raw, loopdev, args.root_partno, squashfs,
                                           "Root Partition", gpt_root_native().root)
 
-def make_verity(args: CommandLineArguments, workspace, dev, run_build_script: bool, for_cache: bool) -> Tuple[Optional[BinaryIO], Optional[str]]:
+def make_verity(args: CommandLineArguments, dev, run_build_script: bool, for_cache: bool) -> Tuple[Optional[BinaryIO], Optional[str]]:
 
     if run_build_script or not args.verity:
         return None, None
@@ -2077,7 +2077,7 @@ def make_verity(args: CommandLineArguments, workspace, dev, run_build_script: bo
 
         raise ValueError('Root hash not found')
 
-def insert_verity(args, workspace, raw, loopdev, verity, root_hash, for_cache):
+def insert_verity(args, raw, loopdev, verity, root_hash, for_cache):
 
     if verity is None:
         return
@@ -2088,7 +2088,7 @@ def insert_verity(args, workspace, raw, loopdev, verity, root_hash, for_cache):
     u = uuid.UUID(root_hash[-32:])
 
     with complete_step('Inserting verity partition'):
-        insert_partition(args, workspace, raw, loopdev, args.verity_partno, verity,
+        insert_partition(args, raw, loopdev, args.verity_partno, verity,
                          "Verity Partition", gpt_root_native().verity, u)
 
 def patch_root_uuid(args, loopdev, root_hash, for_cache):
@@ -3485,16 +3485,16 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
                     set_root_password(args, workspace.name, run_build_script, for_cache)
                     run_postinst_script(args, workspace.name, run_build_script, for_cache)
 
-                reset_machine_id(args, workspace.name, run_build_script, for_cache)
-                reset_random_seed(args, workspace.name)
+                reset_machine_id(workspace.name, run_build_script, for_cache)
+                reset_random_seed(workspace.name)
                 make_read_only(args, workspace.name, for_cache)
 
             squashfs = make_squashfs(args, workspace.name, for_cache)
-            insert_squashfs(args, workspace.name, raw, loopdev, squashfs, for_cache)
+            insert_squashfs(args, raw, loopdev, squashfs, for_cache)
 
-            verity, root_hash = make_verity(args, workspace.name, encrypted_root, run_build_script, for_cache)
+            verity, root_hash = make_verity(args, encrypted_root, run_build_script, for_cache)
             patch_root_uuid(args, loopdev, root_hash, for_cache)
-            insert_verity(args, workspace.name, raw, loopdev, verity, root_hash, for_cache)
+            insert_verity(args, raw, loopdev, verity, root_hash, for_cache)
 
             # This time we mount read-only, as we already generated
             # the verity data, and hence really shouldn't modify the
