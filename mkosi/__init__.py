@@ -151,7 +151,10 @@ def gpt_root_native() -> GPTRootTypePair:
         die("Unknown architecture {}.".format(platform.machine()))
 
 def unshare(flags: int) -> None:
-    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    libc_name = ctypes.util.find_library("c")
+    if libc_name is None:
+        die("Could not find libc")
+    libc = ctypes.CDLL(libc_name, use_errno=True)
 
     if libc.unshare(ctypes.c_int(flags)) != 0:
         e = ctypes.get_errno()
@@ -558,8 +561,8 @@ def mkfs_xfs(label: str, dev: str) -> None:
 def luks_format(dev: str, passphrase: Dict[str, str]) -> None:
 
     if passphrase['type'] == 'stdin':
-        passphrase = (passphrase['content'] + "\n").encode("utf-8")
-        run(["cryptsetup", "luksFormat", "--batch-mode", dev], input=passphrase, check=True)
+        passphrase_content = (passphrase['content'] + "\n").encode("utf-8")
+        run(["cryptsetup", "luksFormat", "--batch-mode", dev], input=passphrase_content, check=True)
     else:
         assert passphrase['type'] == 'file'
         run(["cryptsetup", "luksFormat", "--batch-mode", dev, passphrase['content']], check=True)
@@ -569,8 +572,8 @@ def luks_open(dev: str, passphrase: Dict[str, str]) -> str:
     name = str(uuid.uuid4())
 
     if passphrase['type'] == 'stdin':
-        passphrase = (passphrase['content'] + "\n").encode("utf-8")
-        run(["cryptsetup", "open", "--type", "luks", dev, name], input=passphrase, check=True)
+        passphrase_content = (passphrase['content'] + "\n").encode("utf-8")
+        run(["cryptsetup", "open", "--type", "luks", dev, name], input=passphrase_content, check=True)
     else:
         assert passphrase['type'] == 'file'
         run(["cryptsetup", "--key-file", passphrase['content'], "open", "--type", "luks", dev, name], check=True)
@@ -667,9 +670,10 @@ def luks_setup_srv(args: CommandLineArguments, loopdev: str, run_build_script: b
         return luks_open(ensured_partition(loopdev, args.srv_partno), args.passphrase)
 
 @contextlib.contextmanager
-def luks_setup_all(args: CommandLineArguments, loopdev: str, run_build_script: bool) -> Iterator[Tuple[Optional[str], Optional[str], Optional[str]]]:
+def luks_setup_all(args: CommandLineArguments, loopdev: Optional[str], run_build_script: bool) -> Iterator[Tuple[Optional[str], Optional[str], Optional[str]]]:
 
-    if args.output_format in (OutputFormat.directory, OutputFormat.subvolume, OutputFormat.tar):
+    if loopdev is None:
+        assert args.output_format in (OutputFormat.directory, OutputFormat.subvolume, OutputFormat.tar)
         yield (None, None, None)
         return
 
@@ -747,8 +751,8 @@ def mount_tmpfs(where: str) -> None:
     run(["mount", "tmpfs", "-t", "tmpfs", where], check=True)
 
 @contextlib.contextmanager
-def mount_image(args: CommandLineArguments, workspace: str, loopdev: str, root_dev: Optional[str], home_dev: Optional[str], srv_dev: Optional[str], root_read_only: bool=False) -> Iterator[None]:
-    if loopdev is None:
+def mount_image(args: CommandLineArguments, workspace: str, loopdev: Optional[str], root_dev: Optional[str], home_dev: Optional[str], srv_dev: Optional[str], root_read_only: bool=False) -> Iterator[None]:
+    if loopdev is None or root_dev is None:
         yield None
         return
 
@@ -958,11 +962,12 @@ def run_workspace_command(args: CommandLineArguments, workspace: str, *cmd: str,
     cmdline += ['--', *cmd]
     run(cmdline, check=True)
 
-def check_if_url_exists(url: str) -> Optional[bool]:
+def check_if_url_exists(url: str) -> bool:
     req = urllib.request.Request(url, method="HEAD")
     try:
         if urllib.request.urlopen(req):
             return True
+        return False
     except:
         return False
 
@@ -1633,8 +1638,8 @@ def install_opensuse(args: CommandLineArguments, workspace: str, run_build_scrip
             f.write("hostonly=no\n")
 
         # dracut from openSUSE is missing upstream commit 016613c774baf.
-        with open(os.path.join(root, "etc/kernel/cmdline"), "w") as cmdline:
-            cmdline.write(args.kernel_commandline + " root=/dev/gpt-auto-root\n")
+        with open(os.path.join(root, "etc/kernel/cmdline"), "w") as cmdlinefile:
+            cmdlinefile.write(args.kernel_commandline + " root=/dev/gpt-auto-root\n")
 
 def install_distribution(args: CommandLineArguments, workspace: str, run_build_script: bool, cached: bool) -> None:
 
@@ -1742,7 +1747,7 @@ def find_kernel_file(workspace_root: str, pattern: str) -> Optional[str]:
         kernel_file = kernel_file[len(workspace_root):]
     else:
         sys.stderr.write('Error, kernel file %s cannot be used as it is not in the workspace\n' % kernel_file)
-        return
+        return None
     if len(kernel_files) > 1:
         warn('More than one kernel file found, will use {}', kernel_file)
     return kernel_file
@@ -1755,7 +1760,9 @@ def install_boot_loader_arch(args: CommandLineArguments, workspace: str) -> None
 
     workspace_root = os.path.join(workspace, "root")
     kernel_version = next(filter(lambda x: x[0].isdigit(), os.listdir(os.path.join(workspace_root, "lib/modules"))))
-    run_workspace_command(args, workspace, "/usr/bin/kernel-install", "add", kernel_version, find_kernel_file(workspace_root, "/boot/vmlinuz-*"))
+    kernel_file = find_kernel_file(workspace_root, "/boot/vmlinuz-*")
+    if kernel_file is not None:
+        run_workspace_command(args, workspace, "/usr/bin/kernel-install", "add", kernel_version, kernel_file)
 
 def install_boot_loader_debian(args: CommandLineArguments, workspace: str) -> None:
     kernel_version = next(filter(lambda x: x[0].isdigit(), os.listdir(os.path.join(workspace, "root", "lib/modules"))))
@@ -1769,25 +1776,26 @@ def install_boot_loader_ubuntu(args: CommandLineArguments, workspace: str) -> No
 def install_boot_loader_opensuse(args: CommandLineArguments, workspace: str) -> None:
     install_boot_loader_debian(args, workspace)
 
-def install_boot_loader_clear(args: CommandLineArguments, workspace: str, loopdev: str) -> None:
+def install_boot_loader_clear(args: CommandLineArguments, workspace: str, loopdev: Optional[str]) -> None:
     nspawn_params = [
         # clr-boot-manager uses blkid in the device backing "/" to
         # figure out uuid and related parameters.
         "--bind-ro=/dev",
-        "--property=DeviceAllow=" + loopdev,
 
         # clr-boot-manager compiled in Clear Linux will assume EFI
         # partition is mounted in "/boot".
         "--bind=" + os.path.join(workspace, "root/efi") + ":/boot",
     ]
-    if args.esp_partno is not None:
-        nspawn_params += ["--property=DeviceAllow=" + ensured_partition(loopdev, args.esp_partno)]
-    if args.root_partno is not None:
-        nspawn_params += ["--property=DeviceAllow=" + ensured_partition(loopdev, args.root_partno)]
+    if loopdev is not None:
+        nspawn_params += ["--property=DeviceAllow=" + loopdev]
+        if args.esp_partno is not None:
+            nspawn_params += ["--property=DeviceAllow=" + ensured_partition(loopdev, args.esp_partno)]
+        if args.root_partno is not None:
+            nspawn_params += ["--property=DeviceAllow=" + ensured_partition(loopdev, args.root_partno)]
 
     run_workspace_command(args, workspace, "/usr/bin/clr-boot-manager", "update", "-i", nspawn_params=nspawn_params)
 
-def install_boot_loader(args: CommandLineArguments, workspace: str, loopdev: str, cached: bool) -> None:
+def install_boot_loader(args: CommandLineArguments, workspace: str, loopdev: Optional[str], cached: bool) -> None:
     if not args.bootable:
         return
 
@@ -1954,12 +1962,7 @@ def make_tar(args: CommandLineArguments, workspace: str, run_build_script: bool,
 
     return f
 
-def make_squashfs(args: CommandLineArguments, workspace: str, for_cache: bool) -> Optional[BinaryIO]:
-    if args.output_format != OutputFormat.raw_squashfs:
-        return None
-    if for_cache:
-        return None
-
+def make_squashfs(args: CommandLineArguments, workspace: str) -> BinaryIO:
     with complete_step('Creating squashfs file system'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(dir=os.path.dirname(args.output), prefix=".mkosi-squashfs"))
         run(["mksquashfs", os.path.join(workspace, "root"), f.name, "-comp", "lz4", "-noappend"],
@@ -2059,22 +2062,12 @@ def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, pa
 
     return blob_size
 
-def insert_squashfs(args: CommandLineArguments, raw: BinaryIO, loopdev: str, squashfs: BinaryIO, for_cache: bool) -> None:
-    if args.output_format != OutputFormat.raw_squashfs:
-        return
-    if for_cache:
-        return
-
+def insert_squashfs(args: CommandLineArguments, raw: BinaryIO, loopdev: str, squashfs: BinaryIO) -> None:
     with complete_step('Inserting squashfs root partition'):
         args.root_size = insert_partition(args, raw, loopdev, args.root_partno, squashfs,
                                           "Root Partition", gpt_root_native().root)
 
-def make_verity(args: CommandLineArguments, dev: str, run_build_script: bool, for_cache: bool) -> Tuple[Optional[BinaryIO], Optional[str]]:
-
-    if run_build_script or not args.verity:
-        return None, None
-    if for_cache:
-        return None, None
+def make_verity(args: CommandLineArguments, dev: str) -> Tuple[BinaryIO, str]:
 
     with complete_step('Generating verity hashes'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(dir=os.path.dirname(args.output), prefix=".mkosi-"))
@@ -2087,12 +2080,7 @@ def make_verity(args: CommandLineArguments, dev: str, run_build_script: bool, fo
 
         raise ValueError('Root hash not found')
 
-def insert_verity(args: CommandLineArguments, raw: BinaryIO, loopdev: str, verity: BinaryIO, root_hash: str, for_cache: bool) -> None:
-
-    if verity is None:
-        return
-    if for_cache:
-        return
+def insert_verity(args: CommandLineArguments, raw: BinaryIO, loopdev: str, verity: BinaryIO, root_hash: str) -> None:
 
     # Use the final 128 bit of the root hash as partition UUID of the verity partition
     u = uuid.UUID(root_hash[-32:])
@@ -2101,12 +2089,7 @@ def insert_verity(args: CommandLineArguments, raw: BinaryIO, loopdev: str, verit
         insert_partition(args, raw, loopdev, args.verity_partno, verity,
                          "Verity Partition", gpt_root_native().verity, u)
 
-def patch_root_uuid(args: CommandLineArguments, loopdev: str, root_hash: Optional[str], for_cache: bool) -> None:
-
-    if root_hash is None:
-        return
-    if for_cache:
-        return
+def patch_root_uuid(args: CommandLineArguments, loopdev: str, root_hash: str) -> None:
 
     # Use the first 128bit of the root hash as partition UUID of the root partition
     u = uuid.UUID(root_hash[:32])
@@ -2209,12 +2192,14 @@ def secure_boot_sign(args: CommandLineArguments, workspace: str, run_build_scrip
 
                 os.rename(p + ".signed", p)
 
-def xz_output(args: CommandLineArguments, raw: BinaryIO) -> BinaryIO:
+def xz_output(args: CommandLineArguments, raw: Optional[BinaryIO]) -> Optional[BinaryIO]:
     if args.output_format not in RAW_FORMATS:
         return raw
 
     if not args.xz:
         return raw
+
+    assert raw is not None
 
     xz_binary = "pxz" if shutil.which("pxz") else "xz"
 
@@ -2224,12 +2209,14 @@ def xz_output(args: CommandLineArguments, raw: BinaryIO) -> BinaryIO:
 
     return f
 
-def qcow2_output(args: CommandLineArguments, raw: BinaryIO) -> BinaryIO:
+def qcow2_output(args: CommandLineArguments, raw: Optional[BinaryIO]) -> Optional[BinaryIO]:
     if args.output_format not in RAW_FORMATS:
         return raw
 
     if not args.qcow2:
         return raw
+
+    assert raw is not None
 
     with complete_step('Converting image file to qcow2'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(prefix=".mkosi-", dir=os.path.dirname(args.output)))
@@ -2273,7 +2260,7 @@ def hash_file(of: TextIO, sf: BinaryIO, fname: str) -> None:
 
     of.write(h.hexdigest() + " *" + fname + "\n")
 
-def calculate_sha256sum(args: CommandLineArguments, raw: Optional[BinaryIO], tar: Optional[BinaryIO], root_hash_file: str, nspawn_settings: str) -> Optional[TextIO]:
+def calculate_sha256sum(args: CommandLineArguments, raw: Optional[BinaryIO], tar: Optional[BinaryIO], root_hash_file: Optional[BinaryIO], nspawn_settings: Optional[BinaryIO]) -> Optional[TextIO]:
     if args.output_format in (OutputFormat.directory, OutputFormat.subvolume):
         return None
 
@@ -2316,12 +2303,14 @@ def calculate_signature(args: CommandLineArguments, checksum: Optional[TextIO]) 
 
     return f
 
-def calculate_bmap(args: CommandLineArguments, raw: BinaryIO) -> Optional[TextIO]:
+def calculate_bmap(args: CommandLineArguments, raw: Optional[BinaryIO]) -> Optional[TextIO]:
     if not args.bmap:
         return None
 
     if args.output_format not in RAW_RW_FS_FORMATS:
         return None
+
+    assert raw is not None
 
     with complete_step('Creating BMAP file'):
         f: TextIO = cast(TextIO, tempfile.NamedTemporaryFile(mode="w+", prefix=".mkosi-", encoding="utf-8",
@@ -2427,6 +2416,7 @@ def print_output_size(args: CommandLineArguments) -> None:
         print_step("Resulting image size is " + format_bytes(st.st_size) + ", consumes " + format_bytes(st.st_blocks * 512) + ".")
 
 def setup_package_cache(args: CommandLineArguments) -> Optional[tempfile.TemporaryDirectory]:
+    d: Optional[tempfile.TemporaryDirectory] = None
     with complete_step('Setting up package cache',
                        'Setting up package cache {} complete') as output:
         if args.cache_path is None:
@@ -2434,7 +2424,6 @@ def setup_package_cache(args: CommandLineArguments) -> Optional[tempfile.Tempora
             args.cache_path = d.name
         else:
             os.makedirs(args.cache_path, 0o755, exist_ok=True)
-            d = None
         output.append(args.cache_path)
 
     return d
@@ -2533,7 +2522,7 @@ def parse_args() -> CommandLineArguments:
     except NameError:
         pass
 
-    args = parser.parse_args(namespace=CommandLineArguments())
+    args = cast(CommandLineArguments, parser.parse_args(namespace=CommandLineArguments()))
 
     if args.verb == "help":
         parser.print_help()
@@ -2599,7 +2588,9 @@ def detect_distribution() -> Tuple[Optional[Distribution], Optional[str]]:
     if id == "clear-linux-os":
         id = "clear"
 
-    d = Distribution.__members__.get(id, None)
+    d: Optional[Distribution] = None
+    if id is not None:
+        d = Distribution.__members__.get(id, None)
 
     if d == Distribution.debian and (version_codename or extracted_codename):
         # debootstrap needs release codenames, not version numbers
@@ -2869,7 +2860,7 @@ def load_defaults_file(fname: str, options: Dict[str, Dict[str, Any]]) -> Option
     try:
         f = open(fname)
     except FileNotFoundError:
-        return
+        return None
 
     config = configparser.ConfigParser(delimiters='=')
     config.optionxform = str
@@ -3472,9 +3463,10 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
         prepare_swap(args, loopdev, cached)
         prepare_esp(args, loopdev, cached)
 
-        luks_format_root(args, loopdev, run_build_script, cached)
-        luks_format_home(args, loopdev, run_build_script, cached)
-        luks_format_srv(args, loopdev, run_build_script, cached)
+        if loopdev is not None:
+            luks_format_root(args, loopdev, run_build_script, cached)
+            luks_format_home(args, loopdev, run_build_script, cached)
+            luks_format_srv(args, loopdev, run_build_script, cached)
 
         with luks_setup_all(args, loopdev, run_build_script) as (encrypted_root, encrypted_home, encrypted_srv):
 
@@ -3501,12 +3493,27 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
                 reset_random_seed(workspace.name)
                 make_read_only(args, workspace.name, for_cache)
 
-            squashfs = make_squashfs(args, workspace.name, for_cache)
-            insert_squashfs(args, raw, loopdev, squashfs, for_cache)
+            root_hash: Optional[str] = None
+            if not for_cache:
+                if args.output_format == OutputFormat.raw_squashfs and not for_cache:
+                    # args.output_format == OutputFormat.raw_*
+                    # -> implies: raw is not None
+                    # -> implies: loopdev is not None
+                    assert raw is not None
+                    assert loopdev is not None
+                    insert_squashfs(args, raw, loopdev, make_squashfs(args, workspace.name))
 
-            verity, root_hash = make_verity(args, encrypted_root, run_build_script, for_cache)
-            patch_root_uuid(args, loopdev, root_hash, for_cache)
-            insert_verity(args, raw, loopdev, verity, root_hash, for_cache)
+                if args.verity and not run_build_script:
+                    # ???
+                    # -> implies: raw is not None
+                    # -> implies: loopdev is not None
+                    # -> implies: encrypted_root is not None
+                    assert raw is not None
+                    assert loopdev is not None
+                    assert encrypted_root is not None
+                    verity, root_hash = make_verity(args, encrypted_root)
+                    patch_root_uuid(args, loopdev, root_hash)
+                    insert_verity(args, raw, loopdev, verity, root_hash)
 
             # This time we mount read-only, as we already generated
             # the verity data, and hence really shouldn't modify the
@@ -3694,14 +3701,18 @@ def run_shell(args: CommandLineArguments) -> None:
 def run_qemu(args: CommandLineArguments) -> None:
 
     # Look for the right qemu command line to use
+    cmdlines: List[List[str]] = []
     ARCH_BINARIES = { 'x86_64' : 'qemu-system-x86_64',
                       'i386'   : 'qemu-system-i386'}
     arch_binary = ARCH_BINARIES.get(platform.machine(), None)
-    for cmdline in ([arch_binary, '-machine', 'accel=kvm'],
-                    ['qemu', '-machine', 'accel=kvm'],
-                    ['qemu-kvm']):
-
-        if cmdline[0] and shutil.which(cmdline[0]):
+    if arch_binary is not None:
+        cmdlines += [[arch_binary, '-machine', 'accel=kvm']]
+    cmdlines += [
+        ['qemu', '-machine', 'accel=kvm'],
+        ['qemu-kvm'],
+    ]
+    for cmdline in cmdlines:
+        if shutil.which(cmdline[0]) is not None:
             break
     else:
         die("Couldn't find QEMU/KVM binary")
