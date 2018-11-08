@@ -11,16 +11,16 @@ from setuptools import setup, find_packages
 setup(
     name="mkosi",
     version="4",
-    description="Create legacy-free OS images",
-    url="https://github.com/systemd/mkosi",
-    maintainer="mkosi contributors",
-    maintainer_email="systemd-devel@lists.freedesktop.org",
+    description="Create OS images (Datawire fork)",
+    url="https://github.com/datawire/testbench-mkosi",
+    maintainer="Luke Shumaker of Datawire",
+    maintainer_email="lukeshu@datawire.io",
     license="LGPLv2+",
 
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'mkosi = mkosi:main',
+            'testbench-mkosi = mkosi:main',
         ],
     },
 )
