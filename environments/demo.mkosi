@@ -15,5 +15,6 @@ RootSize=4G
 Packages=
         docker
 	man
+	sudo
 	networkmanager
 WithNetwork=yes
