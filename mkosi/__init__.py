@@ -1869,7 +1869,7 @@ def prepend_to_environ_path(paths: List[str]) -> None:
 def main() -> None:
     args = load_args()
 
-    if args.verb in ("build", "clean", "shell", "boot", "qemu"):
+    if args.verb not in ("help", "summary"):
         check_root()
         unlink_output(args)
 
