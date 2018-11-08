@@ -1,13 +1,13 @@
 #!/usr/bin/make -rRf
 
 KUBERNAUT ?= kubernaut
-MKOSI ?= sudo mkosi --cache /var/cache/pacman/pkg/
+MKOSI ?= sudo testbench-mkosi --cache /var/cache/pacman/pkg/
 
 HOME ?= ~
 
 #
 
-all: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
+all: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
 .PHONY: all
 
 # Set Make's behavior to do the sane thing
@@ -31,11 +31,14 @@ all: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 %.mk: %.mkosi FORCE
 	@echo $*.osi: $(sort $(shell find $(wildcard $*.mkosi $*.postinst $*.extra))) | ./write-ifchanged $@
 -include environments/*.mk
-%.osi: %.mkosi %.mk %.extra/root/.kube/config
+%.osi: %.mkosi %.mk
 	$(MKOSI) --force \
 	  --output $@ \
 	  --default $*.mkosi \
 	  $(if $(wildcard $*.postinst),--postinst-script $*.postinst) \
 	  $(if $(wildcard $*.extra),--extra-tree $*.extra)
-%.extra/root/.kube/config: %.knaut
-	install -Dm644 $< $@
+
+%.tap %.tap.osi: %.osi %.knaut
+	cp -T -- $*.osi $@.osi
+	$(MKOSI) --output $@.osi --default $*.mkosi withmount install -Dm644 $(abspath $*.knaut) root/.kube/config
+	$(MKOSI) --output $@.osi --default $*.mkosi qemu
