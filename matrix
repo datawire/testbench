@@ -1,0 +1,260 @@
+#!/usr/bin/env python3
+
+import re
+import sys
+from enum import Enum
+from typing import Any, Dict, List, NamedTuple, Optional, TextIO, Tuple
+
+
+def peek_line(reader: TextIO) -> str:
+    pos = reader.tell()
+    line = reader.readline()
+    reader.seek(pos)
+    return line
+
+
+def trim_prefix(s: str, prefix: str) -> str:
+    if s.startswith(prefix):
+        return s[len(s):]
+    return s
+
+
+class TestStatus(Enum):
+    OK = 1
+    NOT_OK = 2
+    TODO_OK = 3
+    TODO_NOT_OK = 4
+    SKIP = 5
+    MISSING = 6
+
+
+class TestCase(NamedTuple):
+    status: TestStatus
+    n: int
+    description: Optional[str]
+    comment: Optional[str]
+    yaml: Optional[Any]
+
+
+def parse_tap12(reader: TextIO) -> Tuple[Dict[int, TestCase], List[str]]:
+    lineno = 0
+    errs: List[str] = []
+
+    def error(msg: str) -> None:
+        errs.append("%s:%s: Invalid TAP12: %s" % (reader.name, lineno, msg))
+
+    plan: Optional[int] = None
+    tests: Dict[int, TestCase] = {}
+    at_end = False
+    prev_test = 0
+    for line in reader:
+        lineno += 1
+        line = line.rstrip("\n")
+        if line.startswith("#"):
+            pass
+        elif at_end:
+            error("Cannot have more output after trailing test plan")
+            break
+        elif line.startswith("TAP version "):
+            error("Cannot specify a version: %s" % repr(line))
+            break
+        elif line.startswith("1.."):
+            if plan is not None:
+                error("Test plan can only be given once")
+                break
+            strplan = trim_prefix(line, "1..")
+            if not strplan.isdigit():
+                error("Not an integer number of tests: %s" % repr(strplan))
+                break
+            if len(tests) > 0:
+                at_end = True
+            plan = int(strplan)
+        elif re.match("^(not )?ok\b", line):
+            m = re.match(r"^(ok|not ok)\b\s*([0-9]+\b)?([^#]*)(#.*)", line)
+            #               1               2          3      4
+            #
+            # 1: status (required)
+            # 2: test number (recommended)
+            # 3: description (recommended)
+            # 4: comment (when necessary)
+            status = TestStatus.OK if m[1] == "ok" else TestStatus.NOT_OK
+            test_number = int(m[2]) if m[2] is not None else (prev_test + 1)
+            description = m[3]
+            comment = m[4]
+
+            # Parse directives
+            if re.match(r"^# TODO( .*)?$", comment, re.IGNORECASE):
+                status = {
+                    TestStatus.OK:     TestStatus.TODO_OK,
+                    TestStatus.NOT_OK: TestStatus.TOD_NOT_OK,
+                }[status]
+            if re.match(r"^# SKIP", comment, re.IGNORECASE):
+                status = TestStatus.SKIP
+
+            tests[test_number] = TestCase(
+                status=status,
+                n=test_number,
+                description=description,
+                comment=comment)
+            prev_test = test_number
+        elif line.startswith("Bail out!"):
+            error(line)
+            break
+        else:
+            pass  # spec says to silently ignore unknown lines
+
+    if plan is not None:
+        for i in range(1, plan+1):
+            if i not in tests:
+                tests[i] = TestCase(status=TestStatus.MISSING, n=i)
+        if len(tests) > plan:
+            error("More test results than test plan indicated, truncating: %d > %d" % (len(tests), plan))
+            trunc: Dict[int, TestCase] = {}
+            for i in range(1, plan+1):
+                trunc[i] = tests[i]
+            tests = trunc
+    return tests, errs
+
+
+def parse_tap13(reader: TextIO) -> Tuple[Dict[int, TestCase], List[str]]:
+    lineno = 0
+    errs: List[str] = []
+
+    def error(msg: str) -> None:
+        errs.append("%s:%s: Invalid TAP13: %s" % (reader.name, lineno, msg))
+
+    firstline = reader.readline.rstrip("\n")
+    lineno += 1
+    if firstline != "TAP version 13":
+        error("First line must be %s" % repr("TAP version 13"))
+        return ({}, errs)
+
+    plan: Optional[int] = None
+    tests: Dict[int, TestCase] = {}
+    at_end = False
+    prev_test = 0
+    for line in reader:
+        lineno += 1
+        line = line.rstrip("\n")
+        if line.startswith("#"):
+            pass
+        elif at_end:
+            error("Cannot have more output after trailing test plan")
+            break
+        elif line.startswith("1.."):
+            if plan is not None:
+                error("Test plan can only be given once")
+                break
+            strplan = trim_prefix(line, "1..")
+            if not strplan.isdigit():
+                error("Not an integer number of tests: %s" % repr(strplan))
+                break
+            if len(tests) > 0:
+                at_end = True
+            plan = int(strplan)
+        elif re.match(r"^(not )?ok\b", line):
+            m = re.match(r"^(ok|not ok)\b\s*([0-9]+\b)?([^#]*)(#.*)", line)
+            #               1               2          3      4
+            #
+            # 1: status (required)
+            # 2: test number (recommended)
+            # 3: description (recommended)
+            # 4: comment (when necessary)
+            status = TestStatus.OK if m[1] == "ok" else TestStatus.NOT_OK
+            test_number = int(m[2]) if m[2] is not None else (prev_test + 1)
+            description = m[3]
+            comment = m[4]
+
+            # Parse directives
+            if re.match(r"^# TODO( .*)?$", comment, re.IGNORECASE):
+                status = {
+                    TestStatus.OK:     TestStatus.TODO_OK,
+                    TestStatus.NOT_OK: TestStatus.TOD_NOT_OK,
+                }[status]
+            if re.match(r"^# SKIP", comment, re.IGNORECASE):
+                status = TestStatus.SKIP
+
+            yaml: Optional[Any] = None
+            if re.match(r"^\s+---$", peek_line(reader).rstrip("\n")):
+                yaml = ""
+                for line in reader:
+                    lineno += 1
+                    line = line.rstrip("\n")
+                    yaml += line + "\n"
+                    if re.match(r"^\s+\.\.\.$", line):
+                        break
+                # Don't bother parsing the YAML; we'd have to pull in
+                # something outside of the stdlib, and we don't intend
+                # to do anytihng with it anyway.
+
+            tests[test_number] = TestCase(
+                status=status,
+                n=test_number,
+                description=description,
+                comment=comment,
+                yaml=yaml)
+            prev_test = test_number
+        elif line.startswith("Bail out!"):
+            error(line)
+            break
+        else:
+            error("Invalid line: %s" % repr(line))
+            break
+
+    if plan is not None:
+        for i in range(1, plan+1):
+            if i not in tests:
+                tests[i] = TestCase(status=TestStatus.MISSING, n=i)
+        if len(tests) > plan:
+            error("More test results than test plan indicated, truncating: %d > %d" % (len(tests), plan))
+            trunc: Dict[int, TestCase] = {}
+            for i in range(1, plan+1):
+                trunc[i] = tests[i]
+            tests = trunc
+    return tests, errs
+
+
+def parse_tap(reader: TextIO) -> Tuple[Dict[int, TestCase], List[str]]:
+    errs: List[str] = []
+
+    def error(msg: str) -> None:
+        # Hard-code the line number as "1"
+        errs.append("%s:1: Invalid TAP: %s" % (reader.name, msg))
+
+    # Peek at the first line to decide the TAP version
+    ver = 12
+    first = peek_line(reader)
+    if first.startswith("TAP version "):
+        strver = trim_prefix(first, "TAP version ")
+        if not strver.isdigit():
+            error("Not an integer version: %s" % repr(strver))
+            return ({}, errs)
+        ver = int(strver)
+        if ver < 13:
+            error("It is illegal to specify a TAP version < 13, got: %d" % ver)
+            return ({}, errs)
+
+    # Call the appropriate parser for that version
+    parsers = {
+        12: parse_tap12,
+        13: parse_tap13,
+    }
+    if ver not in parsers:
+        error("I don't know how to parse TAP version %s" % ver)
+        return ({}, errs)
+    return parsers[ver](reader)
+
+
+def main() -> None:
+    if len(sys.argv < 2):
+        sys.exit("Usage: matrix FILE_1.tap [FILE_2.tap...]")
+
+    filenames = sys.argv[1:]
+    runs: Dict[str, Tuple[Dict[int, TestCase], List[str]]] = {} 
+    for filename in filenames:
+        with open(filename, mode="rt", encoding="utf-8") as file:
+            runs[fname] = parse_tap(file)
+        
+
+if __name__ == "__main__":
+    main()
