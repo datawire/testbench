@@ -14,8 +14,8 @@ def write(fname: str, content: str, mode: int = 0o644) -> None:
     os.chmod(fname, mode)
 
 
-def main(args: List[str]) -> None:
-    write('./etc/systemd/system/testbench-run.target', """
+def main(mountpoint: str, args: List[str]) -> None:
+    write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target'), """
         [Unit]
         Description=testbench-run target
         Requires=multi-user.target
@@ -23,9 +23,9 @@ def main(args: List[str]) -> None:
         Conflicts=rescue.target
         AllowIsolate=yes
         """)
-    os.symlink('testbench-run.target', './etc/systemd/system/default.target')
+    os.symlink('testbench-run.target', os.path.join(mountpoint, 'etc/systemd/system/default.target'))
 
-    write('./etc/systemd/system/testbench-run.service', """
+    write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.service'), """
         [Unit]
         Description=testbench-run service
         Wants=network-online.target
@@ -44,16 +44,16 @@ def main(args: List[str]) -> None:
         """)
     # systemctl enable tesbtench-run.service
     try:
-        os.mkdir('./etc/systemd/system/testbench-run.target.wants', mode=0o755)
+        os.mkdir(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target.wants'), mode=0o755)
     except FileExistsError:
         pass
-    os.symlink('../testbench-run.service', './etc/systemd/system/testbench-run.target.wants/testbench-run.service')
+    os.symlink('../testbench-run.service', os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target.wants/testbench-run.service'))
 
-    write('./etc/testbench-run',
+    write(os.path.join(mountpoint, 'etc/testbench-run'),
           "#!/bin/sh\n" + " ".join(shlex.quote(arg) for arg in args)+"\n",
           mode=0o755)
 
 
 if __name__ == "__main__":
     import sys
-    main(sys.argv[1:])
+    main(sys.argv[1], sys.argv[2:])

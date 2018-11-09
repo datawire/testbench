@@ -11,8 +11,17 @@ ifeq ($(CMD),)
 $(error Must specify a CMD=)
 endif
 
-all: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
+all: run
 .PHONY: all
+
+run: testbench.html
+.PHONY: all
+
+testbench.html: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
+	python -m testbench.matrix $^ > $@
+
+prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
+.PHONY: prepare
 
 # Set Make's behavior to do the sane thing
 .SECONDARY:
@@ -42,10 +51,10 @@ all: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
 	  $(if $(wildcard $*.postinst),--postinst-script $*.postinst) \
 	  $(if $(wildcard $*.extra),--extra-tree $*.extra)
 
-%.tap %.tap.osi: %.osi %.knaut
+%.tap %.tap.osi: %.osi %.knaut FORCE
 	cp -T -- $*.osi $@.osi
 	$(MKOSI) --output $@.osi --default $*.mkosi withmount install -Dm644 $(abspath $*.knaut) root/.kube/config
-	$(MKOSI) --output $@.osi --default $*.mkosi withmount python3 $(abspath testbench/run.py) $(CMD)
+	$(MKOSI) --output $@.osi --default $*.mkosi withmount python3 -m testbench.run . $(CMD)
 	$(MKOSI) --output $@.osi --default $*.mkosi qemu
 	$(MKOSI) --output $@.osi --default $*.mkosi withmount cp ./var/log/testbench-run.tap $(abspath $@)
 .PRECIOUS: %.tap.osi
