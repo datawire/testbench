@@ -45,7 +45,7 @@ all: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
 %.tap %.tap.osi: %.osi %.knaut
 	cp -T -- $*.osi $@.osi
 	$(MKOSI) --output $@.osi --default $*.mkosi withmount install -Dm644 $(abspath $*.knaut) root/.kube/config
-	$(MKOSI) --output $@.osi --default $*.mkosi withmount $(abspath install-tap) $(CMD)
+	$(MKOSI) --output $@.osi --default $*.mkosi withmount python3 $(abspath testbench/run.py) $(CMD)
 	$(MKOSI) --output $@.osi --default $*.mkosi qemu
 	$(MKOSI) --output $@.osi --default $*.mkosi withmount cp ./var/log/testbench-run.tap $(abspath $@)
 .PRECIOUS: %.tap.osi

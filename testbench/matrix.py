@@ -2,7 +2,7 @@ import html
 import sys
 from typing import Dict, List, Optional
 
-from .html import HEAD, TAIL
+from .matrix_html import HEAD, TAIL
 from .tap import TestCase, TestStatus
 from .tap import parse as tap_parse
 
@@ -10,6 +10,7 @@ from .tap import parse as tap_parse
 # mypy doesn't like html.escape()
 def html_escape(i: str, quote: bool) -> str:
     return html.escape(i, quote=quote)
+
 
 def print_cell(s: TestStatus) -> None:
     classes, text = {
@@ -22,6 +23,7 @@ def print_cell(s: TestStatus) -> None:
     }[s]
     print('    <td class="%s">%s</td>' % (classes, text))
 
+
 def main() -> None:
     if len(sys.argv) < 2:
         sys.exit("Usage: %s FILE_1.tap [FILE_2.tap...]" % sys.argv[0])
@@ -32,7 +34,6 @@ def main() -> None:
     for filename in filenames:
         with open(filename, mode="rt", encoding="utf-8") as file:
             file_cases[filename], file_errs[filename] = tap_parse(file)
-            #print("[%s] = %s" % (repr(filename), repr(file_cases[filename])))
 
     # Decide what we'll pretend the canonical list of testcase names is
     longest_len = max(len(cases) for cases in file_cases.values())
