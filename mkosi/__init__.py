@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: LGPL-2.1+
 
-import collections
 import contextlib
 import crypt
 import ctypes
@@ -19,6 +18,7 @@ import uuid
 from subprocess import DEVNULL, PIPE, run
 from typing import (
     BinaryIO,
+    Dict,
     Iterable,
     Iterator,
     List,
@@ -31,6 +31,18 @@ from typing import (
 from . import distros
 from .cli import CommandLineArguments, load_args
 from .disk import ensured_partition
+from .gpt import (
+    GPT_ESP,
+    GPT_FOOTER_SIZE,
+    GPT_HEADER_SIZE,
+    GPT_HOME,
+    GPT_SRV,
+    GPT_SWAP,
+    Partition,
+    gpt_root_native,
+    read_partition_table,
+    write_partition_table,
+)
 from .luks import (
     luks_close,
     luks_format_home,
@@ -58,42 +70,8 @@ if sys.version_info < (3, 5):
 # - work on device nodes
 # - allow passing env vars
 
-GPT_ROOT_X86           = uuid.UUID("44479540f29741b29af7d131d5f0458a")
-GPT_ROOT_X86_64        = uuid.UUID("4f68bce3e8cd4db196e7fbcaf984b709")
-GPT_ROOT_ARM           = uuid.UUID("69dad7102ce44e3cb16c21a1d49abed3")
-GPT_ROOT_ARM_64        = uuid.UUID("b921b0451df041c3af444c6f280d3fae")
-GPT_ROOT_IA64          = uuid.UUID("993d8d3df80e4225855a9daf8ed7ea97")
-GPT_ESP                = uuid.UUID("c12a7328f81f11d2ba4b00a0c93ec93b")
-GPT_SWAP               = uuid.UUID("0657fd6da4ab43c484e50933c84b4f4f")
-GPT_HOME               = uuid.UUID("933ac7e12eb44f13b8440e14e2aef915")
-GPT_SRV                = uuid.UUID("3b8f842520e04f3b907f1a25a76f98e8")
-GPT_ROOT_X86_VERITY    = uuid.UUID("d13c5d3bb5d1422ab29f9454fdc89d76")
-GPT_ROOT_X86_64_VERITY = uuid.UUID("2c7357edebd246d9aec123d437ec2bf5")
-GPT_ROOT_ARM_VERITY    = uuid.UUID("7386cdf2203c47a9a498f2ecce45a2d6")
-GPT_ROOT_ARM_64_VERITY = uuid.UUID("df3300ced69f4c92978c9bfb0f38d820")
-GPT_ROOT_IA64_VERITY   = uuid.UUID("86ed10d5b60745bb8957d350f23d0571")
 
 CLONE_NEWNS = 0x00020000
-
-# 1 MB at the beginning of the disk for the GPT disk label, and
-# another MB at the end (this is actually more than needed.)
-GPT_HEADER_SIZE = 1024*1024
-GPT_FOOTER_SIZE = 1024*1024
-
-GPTRootTypePair = collections.namedtuple('GPTRootTypePair', 'root verity')
-
-def gpt_root_native() -> GPTRootTypePair:
-    """The tag for the native GPT root partition
-
-    Returns a tuple of two tags: for the root partition and for the
-    matching verity partition.
-    """
-    if platform.machine() == "x86_64":
-        return GPTRootTypePair(GPT_ROOT_X86_64, GPT_ROOT_X86_64_VERITY)
-    elif platform.machine() == "aarch64":
-        return GPTRootTypePair(GPT_ROOT_ARM_64, GPT_ROOT_ARM_64_VERITY)
-    else:
-        die("Unknown architecture {}.".format(platform.machine()))
 
 def unshare(flags: int) -> None:
     libc_name = ctypes.util.find_library("c")
@@ -296,14 +274,17 @@ def disable_cow(path: str) -> None:
 
     run(["chattr", "+C", path], stdout=DEVNULL, stderr=DEVNULL, check=False)
 
-def determine_partition_table(args: CommandLineArguments) -> Tuple[str, bool]:
+def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[str, Partition], bool]:
 
+    table: Dict[str, Partition] = {}
     pn = 1
-    table = "label: gpt\n"
     run_sfdisk = False
 
     if args.bootable:
-        table += 'size={}, type={}, name="ESP System Partition"\n'.format(args.esp_size // 512, GPT_ESP)
+        table["p%d" % pn] = Partition(
+            p_size=args.esp_size // 512,
+            p_type=GPT_ESP,
+            p_name="ESP System Partition")
         args.esp_partno = pn
         pn += 1
         run_sfdisk = True
@@ -311,7 +292,10 @@ def determine_partition_table(args: CommandLineArguments) -> Tuple[str, bool]:
         args.esp_partno = None
 
     if args.swap_size is not None:
-        table += 'size={}, type={}, name="Swap Partition"\n'.format(args.swap_size // 512, GPT_SWAP)
+        table["p%d" % pn] = Partition(
+            p_size=args.swap_size // 512,
+            p_type=GPT_SWAP,
+            p_name="Swap Partition")
         args.swap_partno = pn
         pn += 1
         run_sfdisk = True
@@ -323,21 +307,28 @@ def determine_partition_table(args: CommandLineArguments) -> Tuple[str, bool]:
 
     if args.output_format != OutputFormat.raw_btrfs:
         if args.home_size is not None:
-            table += 'size={}, type={}, name="Home Partition"\n'.format(args.home_size // 512, GPT_HOME)
+            table["p%d" % pn] = Partition(
+                p_size=args.home_size // 512,
+                p_type=GPT_HOME,
+                p_name="Home Partition")
             args.home_partno = pn
             pn += 1
             run_sfdisk = True
 
         if args.srv_size is not None:
-            table += 'size={}, type={}, name="Server Data Partition"\n'.format(args.srv_size // 512, GPT_SRV)
+            table["p%d" % pn] = Partition(
+                p_size=args.srv_size // 512,
+                p_type=GPT_SRV,
+                p_name="Server Data Partition")
             args.srv_partno = pn
             pn += 1
             run_sfdisk = True
 
     if args.output_format != OutputFormat.raw_squashfs:
-        table += 'type={}, attrs={}, name="Root Partition"\n'.format(
-            gpt_root_native().root,
-            "GUID:60" if args.read_only and args.output_format != OutputFormat.raw_btrfs else "")
+        table["p%d" % pn] = Partition(
+            p_type=gpt_root_native().root,
+            p_attrs="GUID:60" if args.read_only and args.output_format != OutputFormat.raw_btrfs else None,
+            p_name="Root Partition")
         run_sfdisk = True
 
     args.root_partno = pn
@@ -367,8 +358,7 @@ def create_image(args: CommandLineArguments, workspace: str, for_cache: bool) ->
         table, run_sfdisk = determine_partition_table(args)
 
         if run_sfdisk:
-            run(["sfdisk", "--color=never", f.name], input=table.encode("utf-8"), check=True)
-            run(["sync"])
+            write_partition_table(f.name, table)
 
         args.ran_sfdisk = run_sfdisk
 
@@ -902,53 +892,13 @@ def make_squashfs(args: CommandLineArguments, workspace: str) -> BinaryIO:
 
     return f
 
-def read_partition_table(loopdev: str) -> Tuple[List[str], int]:
-
-    table = []
-    last_sector = 0
-
-    c = run(["sfdisk", "--dump", loopdev], stdout=PIPE, check=True)
-
-    in_body = False
-    for line in c.stdout.decode("utf-8").split('\n'):
-        stripped = line.strip()
-
-        if stripped == "":  # empty line is where the body begins
-            in_body = True
-            continue
-        if not in_body:
-            continue
-
-        table.append(stripped)
-
-        name, rest = stripped.split(":", 1)
-        fields = rest.split(",")
-
-        start = None
-        size = None
-
-        for field in fields:
-            f = field.strip()
-
-            if f.startswith("start="):
-                start = int(f[6:])
-            if f.startswith("size="):
-                size = int(f[5:])
-
-        if start is not None and size is not None:
-            end = start + size
-            if end > last_sector:
-                last_sector = end
-
-    return table, last_sector * 512
-
-def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, partno: int, blob: BinaryIO, name: str, type_uuid: str, uuid: Optional[uuid.UUID]=None) -> int:
+def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, partno: int, blob: BinaryIO, name: str, type_uuid: uuid.UUID, uuid: Optional[uuid.UUID]=None) -> int:
 
     if args.ran_sfdisk:
-        old_table, last_partition_sector = read_partition_table(loopdev)
+        table, last_partition_sector = read_partition_table(loopdev)
     else:
         # No partition table yet? Then let's fake one...
-        old_table = []
+        table = {}
         last_partition_sector = GPT_HEADER_SIZE
 
     blob_size = roundup512(os.stat(blob.name).st_size)
@@ -962,20 +912,14 @@ def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, pa
 
     print_step("Inserting partition of {}...".format(format_bytes(blob_size)))
 
-    table = "label: gpt\n"
+    table["p%d" % (len(table)+1)] = Partition(
+        p_uuid=uuid,
+        p_size=(blob_size + luks_extra) // 512,
+        p_type=type_uuid,
+        p_attrs="GUID:60",
+        p_name=name)
 
-    for t in old_table:
-        table += t + "\n"
-
-    if uuid is not None:
-        table += "uuid=" + str(uuid) + ", "
-
-    table += 'size={}, type={}, attrs=GUID:60, name="{}"\n'.format((blob_size + luks_extra) // 512, type_uuid, name)
-
-    print(table)
-
-    run(["sfdisk", "--color=never", loopdev], input=table.encode("utf-8"), check=True)
-    run(["sync"])
+    write_partition_table(loopdev, table)
 
     print_step("Writing partition...")
 
