@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, TextIO, Tuple
+from typing import Any, Dict, List, Optional, TextIO, Tuple, cast
 
 from .tap import TestCase, TestStatus, peek_line, trim_prefix
 
@@ -42,8 +42,8 @@ def parse(reader: TextIO) -> Tuple[Dict[int, TestCase], List[str]]:
                 at_end = True
             plan = int(strplan)
         elif re.match(r"^(not )?ok\b", line):
-            m = re.match(r"^(ok|not ok)\b\s*([0-9]+\b)?([^#]*)(#.*)?", line)
-            #               1               2          3      4
+            m = cast(Dict[int, str], re.match(r"^(ok|not ok)\b\s*([0-9]+\b)?([^#]*)(#.*)?", line))
+            #                                    1               2          3      4
             #
             # 1: status (required)
             # 2: test number (recommended)
@@ -57,7 +57,7 @@ def parse(reader: TextIO) -> Tuple[Dict[int, TestCase], List[str]]:
             # Parse directives
             if re.match(r"^# TODO( .*)?$", comment or "", flags=re.IGNORECASE):
                 status = {
-                    TestStatus.OK:     TestStatus.TODO_OK,
+                    TestStatus.OK: TestStatus.TODO_OK,
                     TestStatus.NOT_OK: TestStatus.TODO_NOT_OK,
                 }[status]
             if re.match(r"^# SKIP", comment or "", flags=re.IGNORECASE):
