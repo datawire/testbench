@@ -1,4 +1,6 @@
 .mkosi*/
+.mypy_cache/
+__pycache__/
 
 *.osi
 *.knaut
