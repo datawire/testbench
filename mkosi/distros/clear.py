@@ -8,7 +8,7 @@ from typing import List, Optional
 from ..cli import CommandLineArguments
 from ..disk import ensured_partition
 from ..ui import complete_step
-from ..util import run_workspace_command
+from ..utils import run_workspace_command
 
 PKG_CACHE: List[str] = []
 DEFAULT_RELEASE = 'latest'

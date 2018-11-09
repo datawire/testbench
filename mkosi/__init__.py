@@ -219,7 +219,7 @@ def copy(oldpath: str, newpath: str) -> None:
             symlink_f(target, newentry)
             shutil.copystat(entry.path, newentry, follow_symlinks=False)
         else:
-            st = entry.stat(follow_symlinks=False)
+            st = entry.stat(follow_symlinks=False)  # type: ignore # mypy 0.641 doesn't know about follow_symlinks
             if stat.S_ISREG(st.st_mode):
                 copy_file(entry.path, newentry)
             else:
@@ -701,14 +701,23 @@ def set_root_password(args: CommandLineArguments, workspace: str, run_build_scri
 
     if args.password == '':
         with complete_step("Deleting root password"):
-            jj = lambda line: (':'.join(['root', ''] + line.split(':')[2:])
-                               if line.startswith('root:') else line)
+            def jj(line: str) -> str:
+                if line.startswith('root:'):
+                    return ':'.join(['root', ''] + line.split(':')[2:])
+                else:
+                    return line
+
             patch_file(os.path.join(workspace, 'root', 'etc/passwd'), jj)
     elif args.password:
         with complete_step("Setting root password"):
             password = crypt.crypt(args.password, crypt.mksalt(crypt.METHOD_SHA512))
-            jj = lambda line: (':'.join(['root', password] + line.split(':')[2:])
-                               if line.startswith('root:') else line)
+
+            def jj(line: str) -> str:
+                if line.startswith('root:'):
+                    return ':'.join(['root', password] + line.split(':')[2:])
+                else:
+                    return line
+
             patch_file(os.path.join(workspace, 'root', 'etc/shadow'), jj)
 
 def run_postinst_script(args: CommandLineArguments, workspace: str, run_build_script: bool, for_cache: bool) -> None:

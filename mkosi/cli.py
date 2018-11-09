@@ -8,14 +8,14 @@ import os
 import re
 import string
 import sys
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 from . import distros
 from .types import RAW_FORMATS, OutputFormat
 from .ui import die, warn
 
 try:
-    import argcomplete
+    import argcomplete  # type: ignore # type hints for argcomplete don't exist yet
 except ImportError:
     pass
 
@@ -30,12 +30,19 @@ class CommandLineArguments(argparse.Namespace):
     esp_partno: Optional[int] = None
 
 class ListAction(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        l = getattr(namespace, self.dest)
-        if l is None:
-            l = []
-        l.extend(values.split(self.delimiter))
-        setattr(namespace, self.dest, l)
+    delimiter: str
+
+    def __call__(self,  # These typehints are copied from argparse.pyi
+                 parser: argparse.ArgumentParser,
+                 namespace: argparse.Namespace,
+                 values: Union[str, Sequence[Any], None],
+                 option_string: Optional[str]=None) -> None:
+        assert isinstance(values, str)
+        ary = getattr(namespace, self.dest)
+        if ary is None:
+            ary = []
+        ary.extend(values.split(self.delimiter))
+        setattr(namespace, self.dest, ary)
 
 class CommaDelimitedListAction(ListAction):
     delimiter = ","
@@ -388,7 +395,7 @@ def load_defaults_file(fname: str, options: Dict[str, Dict[str, Any]]) -> Option
         return None
 
     config = configparser.ConfigParser(delimiters='=')
-    config.optionxform = str
+    config.optionxform = str  # type: ignore # mypy 0.641 erroneously throws a fit for some reason
     config.read_file(f)
 
     # this is used only for validation

@@ -204,10 +204,15 @@ def find_kernel_file(workspace_root: str, pattern: str) -> Optional[str]:
     return kernel_file
 
 def install_boot_loader(args: CommandLineArguments, workspace: str, loopdev: Optional[str]) -> None:
-    patch_file(os.path.join(workspace, "root", "etc/mkinitcpio.conf"),
-               lambda line: "HOOKS=\"systemd modconf block sd-encrypt filesystems keyboard fsck\"\n" if line.startswith("HOOKS=") and args.encrypt == "all" else
-                            "HOOKS=\"systemd modconf block filesystems fsck\"\n"                     if line.startswith("HOOKS=") else
-                            line)
+    def patch(line: str) -> str:
+        if line.startswith("HOOKS=") and args.encrypt == "all":
+            return"HOOKS=\"systemd modconf block sd-encrypt filesystems keyboard fsck\"\n"
+        elif line.startswith("HOOKS="):
+            return"HOOKS=\"systemd modconf block filesystems fsck\"\n"
+        else:
+            return line
+
+    patch_file(os.path.join(workspace, "root", "etc/mkinitcpio.conf"), patch)
 
     workspace_root = os.path.join(workspace, "root")
     kernel_version = next(filter(lambda x: x[0].isdigit(), os.listdir(os.path.join(workspace_root, "lib/modules"))))
