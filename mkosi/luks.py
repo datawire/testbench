@@ -7,7 +7,7 @@ from subprocess import run
 from typing import Dict, Iterator, Optional, Tuple
 
 from .cli import CommandLineArguments
-from .disk import ensured_partition, partition
+from .gpt import ensured_partition, partition
 from .types import OutputFormat
 from .ui import complete_step
 

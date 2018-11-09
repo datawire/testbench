@@ -1,10 +1,14 @@
 import platform
+import re
 import string
 import uuid
 from subprocess import PIPE, run
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
 from .ui import die
+
+# This file is tailored to Linux/util-linux, and will need to be
+# essentially rewritten for Darwin/diskutil.
 
 GPT_ROOT_X86           = uuid.UUID("44479540f29741b29af7d131d5f0458a")
 GPT_ROOT_X86_64        = uuid.UUID("4f68bce3e8cd4db196e7fbcaf984b709")
@@ -43,7 +47,6 @@ def gpt_root_native() -> GPTRootTypePair:
     else:
         die("Unknown architecture {}.".format(platform.machine()))
 
-
 def sfdisk_quote_char(c: int) -> str:
     # Hex-escape non-(printable-ASCII) bytes, as well as (dquote,
     # backtick, backslash, dollar).  IDK why (backtick, dollar), but
@@ -52,12 +55,10 @@ def sfdisk_quote_char(c: int) -> str:
         return "\\x%02x" % c
     return chr(c)
 
-
 def sfdisk_quote(s: str) -> str:
     b = s.encode("utf-8")
     chars = [sfdisk_quote_char(c) for c in b]
     return '"' + (''.join(chars)) + '"'
-
 
 def sfdisk_unquote(s: str) -> str:
     if s.startswith('"') and s.endswith('"') and len(s) >= 2:
@@ -75,7 +76,6 @@ def sfdisk_unquote(s: str) -> str:
                 ret += rest[0]
                 rest = rest[1:]
     return s
-
 
 class Partition(NamedTuple):
     p_start: Optional[int] = None
@@ -104,12 +104,11 @@ class Partition(NamedTuple):
             fields.append("bootable")
         return ", ".join(fields)
 
-
-def read_partition_table(devpath: str) -> Tuple[Dict[str, Partition], int]:
+def read_partition_table(devpath: str) -> Tuple[Dict[int, Partition], int]:
     """Return a dict of the partitions in the GTP volume at devpath, and
     the location of the last allocated sector"""
 
-    table: Dict[str, Partition] = {}
+    table: Dict[int, Partition] = {}
     last_sector = 0
 
     c = run(["sfdisk", "--dump", devpath], stdout=PIPE, check=True)
@@ -123,7 +122,8 @@ def read_partition_table(devpath: str) -> Tuple[Dict[str, Partition], int]:
         if not in_body:
             continue
 
-        name, rest = stripped.split(":", 1)
+        part_name, rest = stripped.split(":", 1)
+        parn_num = int(re.sub(r".*[^0-9]", '', part_name))
         # BUG: this won't correctly handle a comma inside of a quoted name= field
         fields = rest.split(",")
 
@@ -154,13 +154,13 @@ def read_partition_table(devpath: str) -> Tuple[Dict[str, Partition], int]:
             if f == "bootable":
                 p_bootable = True
 
-        table[name] = Partition(p_start=p_start,
-                                p_size=p_size,
-                                p_type=p_type,
-                                p_uuid=p_uuid,
-                                p_name=p_name,
-                                p_attrs=p_attrs,
-                                p_bootable=p_bootable)
+        table[parn_num] = Partition(p_start=p_start,
+                                    p_size=p_size,
+                                    p_type=p_type,
+                                    p_uuid=p_uuid,
+                                    p_name=p_name,
+                                    p_attrs=p_attrs,
+                                    p_bootable=p_bootable)
 
         if partition.p_start is not None and partition.p_size is not None:
             end = partition.p_start + partition.p_size
@@ -169,11 +169,23 @@ def read_partition_table(devpath: str) -> Tuple[Dict[str, Partition], int]:
 
     return table, last_sector * 512
 
-def write_partition_table(devpath: str, table: Dict[str, Partition]) -> None:
+def write_partition_table(devpath: str, table: Dict[int, Partition]) -> None:
 
     txt = "label: gpt\n"
-    for partition in table.values():
-        txt += str(partition) + "\n"
+    for part_num, part_info in table.items():
+        txt += "%s : %s\n" % (ensured_partition(devpath, part_num), str(part_info))
 
     run(["sfdisk", "--color=never", devpath], input=txt.encode("utf-8"), check=True)
     run(["sync"])
+
+def partition(devpath: str, partno: Optional[int]) -> Optional[str]:
+    if partno is None:
+        return None
+
+    return ensured_partition(devpath, partno)
+
+def ensured_partition(devpath: str, partno: int) -> str:
+    if devpath[-1] in "0123456789":
+        return devpath + "p" + str(partno)
+    else:
+        return devpath + str(partno)

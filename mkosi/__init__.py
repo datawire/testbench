@@ -30,7 +30,6 @@ from typing import (
 
 from . import distros
 from .cli import CommandLineArguments, load_args
-from .disk import ensured_partition
 from .gpt import (
     GPT_ESP,
     GPT_FOOTER_SIZE,
@@ -39,6 +38,7 @@ from .gpt import (
     GPT_SRV,
     GPT_SWAP,
     Partition,
+    ensured_partition,
     gpt_root_native,
     read_partition_table,
     write_partition_table,
@@ -274,14 +274,14 @@ def disable_cow(path: str) -> None:
 
     run(["chattr", "+C", path], stdout=DEVNULL, stderr=DEVNULL, check=False)
 
-def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[str, Partition], bool]:
+def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[int, Partition], bool]:
 
-    table: Dict[str, Partition] = {}
+    table: Dict[int, Partition] = {}
     pn = 1
     run_sfdisk = False
 
     if args.bootable:
-        table["p%d" % pn] = Partition(
+        table[pn] = Partition(
             p_size=args.esp_size // 512,
             p_type=GPT_ESP,
             p_name="ESP System Partition")
@@ -292,7 +292,7 @@ def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[str, Par
         args.esp_partno = None
 
     if args.swap_size is not None:
-        table["p%d" % pn] = Partition(
+        table[pn] = Partition(
             p_size=args.swap_size // 512,
             p_type=GPT_SWAP,
             p_name="Swap Partition")
@@ -307,7 +307,7 @@ def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[str, Par
 
     if args.output_format != OutputFormat.raw_btrfs:
         if args.home_size is not None:
-            table["p%d" % pn] = Partition(
+            table[pn] = Partition(
                 p_size=args.home_size // 512,
                 p_type=GPT_HOME,
                 p_name="Home Partition")
@@ -316,7 +316,7 @@ def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[str, Par
             run_sfdisk = True
 
         if args.srv_size is not None:
-            table["p%d" % pn] = Partition(
+            table[pn] = Partition(
                 p_size=args.srv_size // 512,
                 p_type=GPT_SRV,
                 p_name="Server Data Partition")
@@ -325,7 +325,7 @@ def determine_partition_table(args: CommandLineArguments) -> Tuple[Dict[str, Par
             run_sfdisk = True
 
     if args.output_format != OutputFormat.raw_squashfs:
-        table["p%d" % pn] = Partition(
+        table[pn] = Partition(
             p_type=gpt_root_native().root,
             p_attrs="GUID:60" if args.read_only and args.output_format != OutputFormat.raw_btrfs else None,
             p_name="Root Partition")
@@ -912,7 +912,7 @@ def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, pa
 
     print_step("Inserting partition of {}...".format(format_bytes(blob_size)))
 
-    table["p%d" % (len(table)+1)] = Partition(
+    table[max(table.keys())+1] = Partition(
         p_uuid=uuid,
         p_size=(blob_size + luks_extra) // 512,
         p_type=type_uuid,

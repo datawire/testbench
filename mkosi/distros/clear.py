@@ -6,7 +6,7 @@ from subprocess import run
 from typing import List, Optional
 
 from ..cli import CommandLineArguments
-from ..disk import ensured_partition
+from ..gpt import ensured_partition
 from ..ui import complete_step
 from ..utils import run_workspace_command
 
