@@ -206,9 +206,9 @@ def find_kernel_file(workspace_root: str, pattern: str) -> Optional[str]:
 def install_boot_loader(args: CommandLineArguments, workspace: str, loopdev: Optional[str]) -> None:
     def patch(line: str) -> str:
         if line.startswith("HOOKS=") and args.encrypt == "all":
-            return"HOOKS=\"systemd modconf block sd-encrypt filesystems keyboard fsck\"\n"
+            return"HOOKS=(systemd modconf block sd-encrypt filesystems keyboard fsck)\n"
         elif line.startswith("HOOKS="):
-            return"HOOKS=\"systemd modconf block filesystems fsck\"\n"
+            return"HOOKS=(systemd modconf block filesystems fsck)\n"
         else:
             return line
 
