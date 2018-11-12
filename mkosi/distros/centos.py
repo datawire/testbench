@@ -3,12 +3,12 @@
 import os.path
 from typing import Optional
 
-from ..cli import CommandLineArguments
 from ..rpm import (
     disable_kernel_install,
     invoke_dnf_or_yum,
     reenable_kernel_install,
 )
+from ..types import CommandLineArguments
 from ..ui import complete_step
 
 # We mount both the YUM and the DNF cache in this case, as YUM might

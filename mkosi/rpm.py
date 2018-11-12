@@ -7,8 +7,7 @@ import shutil
 from subprocess import run
 from typing import Iterator, List
 
-from .cli import CommandLineArguments
-from .types import OutputFormat
+from .types import CommandLineArguments, OutputFormat
 from .ui import complete_step
 from .utils import mkdir_last, mount_bind, umount
 

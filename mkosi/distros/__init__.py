@@ -4,7 +4,7 @@ import importlib
 import pkgutil
 from typing import List, Optional, cast
 
-from ..cli import CommandLineArguments
+from ..types import CommandLineArguments
 
 
 class Distribution:  # Inherit from typing.Protocol, once it's available

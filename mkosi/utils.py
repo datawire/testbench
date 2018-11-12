@@ -8,7 +8,9 @@ import uuid
 from subprocess import DEVNULL, run
 from typing import Callable, Dict, List
 
-from .cli import CommandLineArguments
+from .btrfs import btrfs_subvol_delete
+from .types import CommandLineArguments
+from .ui import die
 
 
 def mount_bind(what: str, where: str) -> None:
@@ -81,3 +83,31 @@ def mkdir_last(path: str, mode: int=0o777) -> str:
 
 def var_tmp(workspace: str) -> str:
     return mkdir_last(os.path.join(workspace, "var-tmp"))
+
+def unlink_try_hard(path: str) -> None:
+    try:
+        os.unlink(path)
+    except:
+        pass
+
+    try:
+        btrfs_subvol_delete(path)
+    except:
+        pass
+
+    try:
+        shutil.rmtree(path)
+    except:
+        pass
+
+def empty_directory(path: str) -> None:
+
+    try:
+        for f in os.listdir(path):
+            unlink_try_hard(os.path.join(path, f))
+    except FileNotFoundError:
+        pass
+
+def check_root() -> None:
+    if os.getuid() != 0:
+        die("Must be invoked as root.")

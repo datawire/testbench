@@ -10,8 +10,8 @@ import string
 import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union, cast
 
-from . import distros
-from .types import RAW_FORMATS, OutputFormat
+from . import distros, verbs
+from .types import RAW_FORMATS, CommandLineArguments, OutputFormat
 from .ui import die, warn
 
 try:
@@ -19,15 +19,7 @@ try:
 except ImportError:
     pass
 
-
 __version__ = '4'
-
-class CommandLineArguments(argparse.Namespace):
-    """Type-hinted storage for command line arguments."""
-
-    output: str
-    swap_partno: Optional[int] = None
-    esp_partno: Optional[int] = None
 
 class ListAction(argparse.Action):
     delimiter: str
@@ -54,7 +46,7 @@ def parse_args() -> CommandLineArguments:
     parser = argparse.ArgumentParser(description='Build Legacy-Free OS Images', add_help=False)
 
     group = parser.add_argument_group("Commands")
-    group.add_argument("verb", choices=("build", "clean", "help", "summary", "shell", "boot", "qemu", "withmount"), nargs='?', default="build", help='Operation to execute')
+    group.add_argument("verb", choices=verbs.list_verbs()+['help'], nargs='?', default="build", help='Operation to execute')
     group.add_argument("cmdline", nargs=argparse.REMAINDER, help="The command line to use for 'shell', 'boot', 'qemu', 'withmount'")
     group.add_argument('-h', '--help', action='help', help="Show this help")
     group.add_argument('--version', action='version', version='%(prog)s ' + __version__)

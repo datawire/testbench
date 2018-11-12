@@ -8,8 +8,7 @@ import sys
 from subprocess import PIPE, CompletedProcess, run
 from typing import List, Optional, Set
 
-from ..cli import CommandLineArguments
-from ..types import OutputFormat
+from ..types import CommandLineArguments, OutputFormat
 from ..ui import complete_step, warn
 from ..utils import patch_file, run_workspace_command
 

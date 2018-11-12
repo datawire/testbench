@@ -3,7 +3,7 @@
 import platform
 from typing import Optional
 
-from ..cli import CommandLineArguments
+from ..types import CommandLineArguments
 from ..ui import complete_step
 from .debian import debootstrap
 from .debian import install_boot_loader as install_boot_loader_debian

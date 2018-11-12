@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: LGPL-2.1+
 
+import argparse
 from enum import Enum
+from typing import Optional
 
 
 class OutputFormat(Enum):
@@ -20,3 +22,10 @@ RAW_RW_FS_FORMATS = (
 )
 
 RAW_FORMATS = (*RAW_RW_FS_FORMATS, OutputFormat.raw_squashfs)
+
+class CommandLineArguments(argparse.Namespace):
+    """Type-hinted storage for command line arguments."""
+
+    output: str
+    swap_partno: Optional[int] = None
+    esp_partno: Optional[int] = None

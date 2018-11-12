@@ -6,9 +6,8 @@ import uuid
 from subprocess import run
 from typing import Dict, Iterator, Optional, Tuple
 
-from .cli import CommandLineArguments
 from .gpt import ensured_partition, partition
-from .types import OutputFormat
+from .types import CommandLineArguments, OutputFormat
 from .ui import complete_step
 
 

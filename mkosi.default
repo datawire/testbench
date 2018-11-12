@@ -1,1 +1,20 @@
-mkosi.files/mkosi.fedora
+# SPDX-License-Identifier: LGPL-2.1+
+# Let's build an image that is just good enough to build new mkosi images again
+
+[Distribution]
+Distribution=arch
+
+[Output]
+Format=raw_btrfs
+Bootable=yes
+
+[Partitions]
+RootSize=4G
+
+[Packages]
+Packages=
+        docker
+	man
+	sudo
+	networkmanager
+WithNetwork=yes

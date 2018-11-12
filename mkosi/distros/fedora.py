@@ -4,8 +4,8 @@ import os
 import sys
 from typing import Optional
 
-from ..cli import CommandLineArguments
 from ..rpm import disable_kernel_install, invoke_dnf, reenable_kernel_install
+from ..types import CommandLineArguments
 from ..ui import complete_step, warn
 from ..utils import check_if_url_exists
 

@@ -24,3 +24,13 @@ def complete_step(text: str, text2: Optional[str]=None) -> Iterator[List[Any]]:
     if text2 is None:
         text2 = text + ' complete'
     print_step(text2.format(*args) + '.')
+
+def format_bytes(bytes: int) -> str:
+    if bytes >= 1024*1024*1024:
+        return "{:0.1f}G".format(bytes / 1024**3)
+    if bytes >= 1024*1024:
+        return "{:0.1f}M".format(bytes / 1024**2)
+    if bytes >= 1024:
+        return "{:0.1f}K".format(bytes / 1024)
+
+    return "{}B".format(bytes)

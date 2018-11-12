@@ -4,8 +4,7 @@ import os
 from subprocess import run
 from typing import List, Optional
 
-from ..cli import CommandLineArguments
-from ..types import OutputFormat
+from ..types import CommandLineArguments, OutputFormat
 from ..ui import complete_step
 from .debian import install_boot_loader as install_boot_loader_debian
 
