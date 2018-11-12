@@ -10,7 +10,7 @@ from typing import Iterator, List
 from .cli import CommandLineArguments
 from .types import OutputFormat
 from .ui import complete_step
-from .utils import mkdir_last, mount_bind, run_build_script, umount
+from .utils import mkdir_last, mount_bind, umount
 
 
 @contextlib.contextmanager
@@ -28,7 +28,7 @@ def mount_api_vfs(args: CommandLineArguments, workspace: str) -> Iterator[None]:
             for d in paths:
                 umount(root + d)
 
-def invoke_dnf(args: CommandLineArguments, workspace: str, repositories: List[str], base_packages: List[str], boot_packages: List[str], config_file: str) -> None:
+def invoke_dnf(args: CommandLineArguments, workspace: str, repositories: List[str], base_packages: List[str], boot_packages: List[str], config_file: str, run_build_script: bool=True) -> None:
 
     repos = ["--enablerepo=" + repo for repo in repositories]
 
@@ -78,7 +78,7 @@ def invoke_dnf(args: CommandLineArguments, workspace: str, repositories: List[st
     with mount_api_vfs(args, workspace):
         run(cmdline, check=True)
 
-def invoke_yum(args: CommandLineArguments, workspace: str, repositories: List[str], base_packages: List[str], boot_packages: List[str], config_file: str) -> None:
+def invoke_yum(args: CommandLineArguments, workspace: str, repositories: List[str], base_packages: List[str], boot_packages: List[str], config_file: str, run_build_script: bool=True) -> None:
 
     repos = ["--enablerepo=" + repo for repo in repositories]
 

@@ -6,10 +6,9 @@ import shutil
 import urllib.request
 import uuid
 from subprocess import DEVNULL, run
-from typing import BinaryIO, Callable, Dict, List, Optional
+from typing import Callable, Dict, List
 
 from .cli import CommandLineArguments
-from .ui import complete_step
 
 
 def mount_bind(what: str, where: str) -> None:
@@ -82,48 +81,3 @@ def mkdir_last(path: str, mode: int=0o777) -> str:
 
 def var_tmp(workspace: str) -> str:
     return mkdir_last(os.path.join(workspace, "var-tmp"))
-
-def run_build_script(args: CommandLineArguments, workspace: str, raw: Optional[BinaryIO]) -> None:
-    if args.build_script is None:
-        return
-
-    with complete_step('Running build script'):
-        dest = os.path.join(workspace, "dest")
-        os.mkdir(dest, 0o755)
-
-        target = "--directory=" + os.path.join(workspace, "root") if raw is None else "--image=" + raw.name
-
-        cmdline = ["systemd-nspawn",
-                   '--quiet',
-                   target,
-                   "--uuid=" + args.machine_id,
-                   "--machine=mkosi-" + uuid.uuid4().hex,
-                   "--as-pid2",
-                   "--register=no",
-                   "--bind", dest + ":/root/dest",
-                   "--bind=" + var_tmp(workspace) + ":/var/tmp",
-                   "--setenv=WITH_DOCS=" + ("1" if args.with_docs else "0"),
-                   "--setenv=WITH_TESTS=" + ("1" if args.with_tests else "0"),
-                   "--setenv=DESTDIR=/root/dest"]
-
-        if args.build_sources is not None:
-            cmdline.append("--setenv=SRCDIR=/root/src")
-            cmdline.append("--chdir=/root/src")
-
-            if args.read_only:
-                cmdline.append("--overlay=+/root/src::/root/src")
-        else:
-            cmdline.append("--chdir=/root")
-
-        if args.build_dir is not None:
-            cmdline.append("--setenv=BUILDDIR=/root/build")
-            cmdline.append("--bind=" + args.build_dir + ":/root/build")
-
-        if args.with_network:
-            # If we're using the host network namespace, use the same resolver
-            cmdline.append("--bind-ro=/etc/resolv.conf")
-        else:
-            cmdline.append("--private-network")
-
-        cmdline.append("/root/" + os.path.basename(args.build_script))
-        run(cmdline, check=True)
