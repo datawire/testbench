@@ -18,6 +18,7 @@ from typing import BinaryIO, Dict, Iterator, Optional, TextIO, Tuple, cast
 from . import summary
 from .. import distros
 from ..btrfs import btrfs_subvol_create, btrfs_subvol_make_ro
+from ..docker import run_in_docker
 from ..gpt import (
     GPT_ESP,
     GPT_FOOTER_SIZE,
@@ -1545,5 +1546,6 @@ def do(args: CommandLineArguments) -> None:
     summary.do(args)
     check_root()
     init_namespace(args)
-    build_stuff(args)
+    run_in_docker(build_stuff, [args],
+                  ['mkosi', 'mkosi.btrfs', 'mkosi.cli', 'mkosi.distros', 'mkosi.gpt', 'mkosi.luks', 'mkosi.rpm', 'mkosi.types', 'mkosi.ui', 'mkosi.utils'])
     print_output_size(args)
