@@ -5,11 +5,11 @@ import os
 import os.path
 import platform
 import sys
-from subprocess import PIPE, CompletedProcess, run
+from subprocess import PIPE, CompletedProcess
 from typing import List, Optional, Set
 
 from ..types import CommandLineArguments, OutputFormat
-from ..ui import complete_step, warn
+from ..ui import complete_step, run_visible, warn
 from ..utils import patch_file, run_workspace_command
 
 PKG_CACHE = ['var/cache/pacman/pkg']
@@ -19,10 +19,10 @@ if platform.machine() == "aarch64":
     DEFAILT_MIRROR = "http://mirror.archlinuxarm.org"
 
 def enable_networkd(workspace: str) -> None:
-    run(["systemctl",
-         "--root", os.path.join(workspace, "root"),
-         "enable", "systemd-networkd", "systemd-resolved"],
-        check=True)
+    run_visible(["systemctl",
+                 "--root", os.path.join(workspace, "root"),
+                 "enable", "systemd-networkd", "systemd-resolved"],
+                check=True)
 
     os.remove(os.path.join(workspace, "root", "etc/resolv.conf"))
     os.symlink("../run/systemd/resolve/stub-resolv.conf", os.path.join(workspace, "root", "etc/resolv.conf"))
@@ -37,10 +37,10 @@ DHCP=yes
 """)
 
 def enable_networkmanager(workspace: str) -> None:
-    run(["systemctl",
-         "--root", os.path.join(workspace, "root"),
-         "enable", "NetworkManager"],
-        check=True)
+    run_visible(["systemctl",
+                 "--root", os.path.join(workspace, "root"),
+                 "enable", "NetworkManager"],
+                check=True)
 
 @complete_step('Installing Arch Linux')
 def install(args: CommandLineArguments, workspace: str, run_build_script: bool) -> None:
@@ -90,7 +90,7 @@ SigLevel    = Required DatabaseOptional
             "--color", "never",
             "--config", pacman_conf,
         ]
-        return run(cmdline + args, **kwargs, check=True)
+        return run_visible(cmdline + args, **kwargs, check=True)
 
     def run_pacman_key(args: List[str]) -> CompletedProcess:
         cmdline = [
@@ -98,11 +98,11 @@ SigLevel    = Required DatabaseOptional
             "--nocolor",
             "--config", pacman_conf,
         ]
-        return run(cmdline + args, check=True)
+        return run_visible(cmdline + args, check=True)
 
     def run_pacstrap(packages: Set[str]) -> None:
         cmdline = ["pacstrap", "-C", pacman_conf, "-dGM", root]
-        run(cmdline + list(packages), check=True)
+        run_visible(cmdline + list(packages), check=True)
 
     keyring = "archlinux"
     if platform.machine() == "aarch64":
@@ -169,7 +169,7 @@ SigLevel    = Required DatabaseOptional
         run_pacstrap(packages)
 
     # Kill the gpg-agent used by pacman and pacman-key
-    run(['gpg-connect-agent', '--homedir', os.path.join(root, 'etc/pacman.d/gnupg'), 'KILLAGENT', '/bye'])
+    run_visible(['gpg-connect-agent', '--homedir', os.path.join(root, 'etc/pacman.d/gnupg'), 'KILLAGENT', '/bye'])
 
     if "networkmanager" in args.packages:
         enable_networkmanager(workspace)
@@ -185,7 +185,7 @@ SigLevel    = Required DatabaseOptional
         f.write('LANG=en_US.UTF-8\n')
 
     # At this point, no process should be left running, kill then
-    run(["fuser", "-c", root, "--kill"])
+    run_visible(["fuser", "-c", root, "--kill"])
 
 def find_kernel_file(workspace_root: str, pattern: str) -> Optional[str]:
     # Look for the vmlinuz file in the workspace

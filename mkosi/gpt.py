@@ -2,10 +2,10 @@ import platform
 import re
 import string
 import uuid
-from subprocess import PIPE, run
+from subprocess import PIPE
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
-from .ui import die
+from .ui import die, run_visible
 
 # This file is tailored to Linux/util-linux, and will need to be
 # essentially rewritten for Darwin/diskutil.
@@ -111,7 +111,7 @@ def read_partition_table(devpath: str) -> Tuple[Dict[int, Partition], int]:
     table: Dict[int, Partition] = {}
     last_sector = 0
 
-    c = run(["sfdisk", "--dump", devpath], stdout=PIPE, check=True)
+    c = run_visible(["sfdisk", "--dump", devpath], stdout=PIPE, check=True)
     in_body = False
     for line in c.stdout.decode("utf-8").split('\n'):
         stripped = line.strip()
@@ -175,8 +175,8 @@ def write_partition_table(devpath: str, table: Dict[int, Partition]) -> None:
     for part_num, part_info in table.items():
         txt += "%s : %s\n" % (ensured_partition(devpath, part_num), str(part_info))
 
-    run(["sfdisk", "--color=never", devpath], input=txt.encode("utf-8"), check=True)
-    run(["sync"])
+    run_visible(["sfdisk", "--color=never", devpath], input=txt.encode("utf-8"), check=True)
+    run_visible(["sync"])
 
 def partition(devpath: str, partno: Optional[int]) -> Optional[str]:
     if partno is None:

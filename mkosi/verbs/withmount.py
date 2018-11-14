@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: LGPL-2.1+
 
 import os
-from subprocess import run
 
 from ..luks import luks_setup_all
 from ..types import CommandLineArguments
+from ..ui import run_visible
 from .build import (
     attach_image_loopback,
     determine_partition_table,
@@ -24,4 +24,4 @@ def do(args: CommandLineArguments) -> None:
         with attach_image_loopback(args, raw) as loopdev:
             with luks_setup_all(args, loopdev, False) as (encrypted_root, encrypted_home, encrypted_srv):
                 with mount_image(args, workspace.name, loopdev, encrypted_root, encrypted_home, encrypted_srv):
-                    run(args.cmdline, cwd=os.path.join(workspace.name, "root"), check=True)
+                    run_visible(args.cmdline, cwd=os.path.join(workspace.name, "root"), check=True)

@@ -3,10 +3,12 @@
 import os
 from subprocess import DEVNULL, PIPE, run
 
+from .ui import run_visible
+
 
 def btrfs_subvol_create(path: str, mode: int=0o755) -> None:
     m = os.umask(~mode & 0o7777)
-    run(["btrfs", "subvol", "create", path], check=True)
+    run_visible(["btrfs", "subvol", "create", path], check=True)
     os.umask(m)
 
 def btrfs_subvol_delete(path: str) -> None:
@@ -15,7 +17,7 @@ def btrfs_subvol_delete(path: str) -> None:
             stdout=PIPE, stderr=DEVNULL, universal_newlines=True, check=True)
     subvol_path = c.stdout.splitlines()[0]
     # Make the subvolume RW again if it was set RO by btrfs_subvol_delete
-    run(["btrfs", "property", "set", path, "ro", "false"], check=True)
+    run_visible(["btrfs", "property", "set", path, "ro", "false"], check=True)
     # Recursively delete the direct children of the subvolume
     c = run(["btrfs", "subvol", "list", "-o", path],
             stdout=PIPE, stderr=DEVNULL, universal_newlines=True, check=True)
@@ -32,4 +34,4 @@ def btrfs_subvol_delete(path: str) -> None:
     run(["btrfs", "subvol", "delete", path], stdout=DEVNULL, stderr=DEVNULL, check=True)
 
 def btrfs_subvol_make_ro(path: str, b: bool=True) -> None:
-    run(["btrfs", "property", "set", path, "ro", "true" if b else "false"], check=True)
+    run_visible(["btrfs", "property", "set", path, "ro", "true" if b else "false"], check=True)

@@ -2,7 +2,8 @@
 
 import contextlib
 import sys
-from typing import Any, Iterator, List, NoReturn, Optional
+from subprocess import CompletedProcess, run
+from typing import Any, Iterator, List, NoReturn, Optional, Sequence, Union
 
 
 def die(message: str, status: int=1) -> NoReturn:
@@ -34,3 +35,8 @@ def format_bytes(bytes: int) -> str:
         return "{:0.1f}K".format(bytes / 1024)
 
     return "{}B".format(bytes)
+
+def run_visible(args: Sequence[Union[bytes, str]], **kwargs) -> CompletedProcess:
+    sys.stderr.flush()
+    sys.stdout.flush()
+    return run(args, **kwargs)

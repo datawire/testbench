@@ -4,11 +4,10 @@ import contextlib
 import os
 import os.path
 import shutil
-from subprocess import run
 from typing import Iterator, List
 
 from .types import CommandLineArguments, OutputFormat
-from .ui import complete_step
+from .ui import complete_step, run_visible
 from .utils import mkdir_last, mount_bind, umount
 
 
@@ -75,7 +74,7 @@ def invoke_dnf(args: CommandLineArguments, workspace: str, repositories: List[st
             cmdline.append("btrfs-progs")
 
     with mount_api_vfs(args, workspace):
-        run(cmdline, check=True)
+        run_visible(cmdline, check=True)
 
 def invoke_yum(args: CommandLineArguments, workspace: str, repositories: List[str], base_packages: List[str], boot_packages: List[str], config_file: str, run_build_script: bool=True) -> None:
 
@@ -119,7 +118,7 @@ def invoke_yum(args: CommandLineArguments, workspace: str, repositories: List[st
             cmdline.append("btrfs-progs")
 
     with mount_api_vfs(args, workspace):
-        run(cmdline, check=True)
+        run_visible(cmdline, check=True)
 
 def invoke_dnf_or_yum(args: CommandLineArguments, workspace: str, repositories: List[str], base_packages: List[str], boot_packages: List[str], config_file: str) -> None:
 

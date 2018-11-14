@@ -46,7 +46,7 @@ from ..types import (
     CommandLineArguments,
     OutputFormat,
 )
-from ..ui import complete_step, die, format_bytes, print_step
+from ..ui import complete_step, die, format_bytes, print_step, run_visible
 from ..utils import (
     check_root,
     mkdir_last,
@@ -185,7 +185,7 @@ def copy(oldpath: str, newpath: str) -> None:
 def init_namespace(args: CommandLineArguments) -> None:
     args.original_umask = os.umask(0o000)
     unshare(CLONE_NEWNS)
-    run(["mount", "--make-rslave", "/"], check=True)
+    run_visible(["mount", "--make-rslave", "/"], check=True)
 
 def setup_workspace(args: CommandLineArguments) -> tempfile.TemporaryDirectory:
     print_step("Setting up temporary workspace.")
@@ -364,8 +364,8 @@ def attach_image_loopback(args: CommandLineArguments, raw: Optional[BinaryIO]) -
 
     with complete_step('Attaching image file',
                        'Attached image file as {}') as output:
-        c = run(["losetup", "--find", "--show", "--partscan", raw.name],
-                stdout=PIPE, check=True)
+        c = run_visible(["losetup", "--find", "--show", "--partscan", raw.name],
+                        stdout=PIPE, check=True)
         loopdev = c.stdout.decode("utf-8").strip()
         output.append(loopdev)
 
@@ -373,7 +373,7 @@ def attach_image_loopback(args: CommandLineArguments, raw: Optional[BinaryIO]) -
         yield loopdev
     finally:
         with complete_step('Detaching image file'):
-            run(["losetup", "--detach", loopdev], check=True)
+            run_visible(["losetup", "--detach", loopdev], check=True)
 
 def prepare_swap(args: CommandLineArguments, loopdev: Optional[str], cached: bool) -> None:
     if loopdev is None:
@@ -384,7 +384,7 @@ def prepare_swap(args: CommandLineArguments, loopdev: Optional[str], cached: boo
         return
 
     with complete_step('Formatting swap partition'):
-        run(["mkswap", "-Lswap", ensured_partition(loopdev, args.swap_partno)], check=True)
+        run_visible(["mkswap", "-Lswap", ensured_partition(loopdev, args.swap_partno)], check=True)
 
 def prepare_esp(args: CommandLineArguments, loopdev: Optional[str], cached: bool) -> None:
     if loopdev is None:
@@ -395,16 +395,16 @@ def prepare_esp(args: CommandLineArguments, loopdev: Optional[str], cached: bool
         return
 
     with complete_step('Formatting ESP partition'):
-        run(["mkfs.fat", "-nEFI", "-F32", ensured_partition(loopdev, args.esp_partno)], check=True)
+        run_visible(["mkfs.fat", "-nEFI", "-F32", ensured_partition(loopdev, args.esp_partno)], check=True)
 
 def mkfs_ext4(label: str, mount: str, dev: str) -> None:
-    run(["mkfs.ext4", "-L", label, "-M", mount, dev], check=True)
+    run_visible(["mkfs.ext4", "-L", label, "-M", mount, dev], check=True)
 
 def mkfs_btrfs(label: str, dev: str) -> None:
-    run(["mkfs.btrfs", "-L", label, "-d", "single", "-m", "single", dev], check=True)
+    run_visible(["mkfs.btrfs", "-L", label, "-d", "single", "-m", "single", dev], check=True)
 
 def mkfs_xfs(label: str, dev: str) -> None:
-    run(["mkfs.xfs", "-n", "ftype=1", "-L", label, dev], check=True)
+    run_visible(["mkfs.xfs", "-n", "ftype=1", "-L", label, dev], check=True)
 
 def prepare_root(args: CommandLineArguments, dev: Optional[str], cached: bool) -> None:
     if dev is None:
@@ -451,11 +451,11 @@ def mount_loop(args: CommandLineArguments, dev: str, where: str, read_only: bool
     if read_only:
         options += ",ro"
 
-    run(["mount", "-n", dev, where, options], check=True)
+    run_visible(["mount", "-n", dev, where, options], check=True)
 
 def mount_tmpfs(where: str) -> None:
     os.makedirs(where, 0o755, True)
-    run(["mount", "tmpfs", "-t", "tmpfs", where], check=True)
+    run_visible(["mount", "tmpfs", "-t", "tmpfs", where], check=True)
 
 @contextlib.contextmanager
 def mount_image(args: CommandLineArguments, workspace: str, loopdev: Optional[str], root_dev: Optional[str], home_dev: Optional[str], srv_dev: Optional[str], root_read_only: bool=False) -> Iterator[None]:
@@ -722,17 +722,17 @@ def copy_git_files(src: str, dest: str, *, git_files: str) -> None:
     if git_files == 'others':
         what_files += ['--others', '--exclude=.mkosi-*']
 
-    c = run(['git', '-C', src, 'ls-files', '-z'] + what_files,
-            stdout=PIPE,
-            universal_newlines=False,
-            check=True)
+    c = run_visible(['git', '-C', src, 'ls-files', '-z'] + what_files,
+                    stdout=PIPE,
+                    universal_newlines=False,
+                    check=True)
     files = {x.decode("utf-8") for x in c.stdout.rstrip(b'\0').split(b'\0')}
 
     # Get submodule files
-    c = run(['git', '-C', src, 'submodule', 'status', '--recursive'],
-            stdout=PIPE,
-            universal_newlines=True,
-            check=True)
+    c = run_visible(['git', '-C', src, 'submodule', 'status', '--recursive'],
+                    stdout=PIPE,
+                    universal_newlines=True,
+                    check=True)
     submodules = {x.split()[1] for x in c.stdout.splitlines()}
 
     # workaround for git-ls-files returning the path of submodules that we will
@@ -740,10 +740,10 @@ def copy_git_files(src: str, dest: str, *, git_files: str) -> None:
     files -= submodules
 
     for sm in submodules:
-        c = run(['git', '-C', os.path.join(src, sm), 'ls-files', '-z'] + what_files,
-                stdout=PIPE,
-                universal_newlines=False,
-                check=True)
+        c = run_visible(['git', '-C', os.path.join(src, sm), 'ls-files', '-z'] + what_files,
+                        stdout=PIPE,
+                        universal_newlines=False,
+                        check=True)
         files |= {os.path.join(sm, x.decode("utf-8"))for x in c.stdout.rstrip(b'\0').split(b'\0')}
         files -= submodules
 
@@ -824,17 +824,17 @@ def make_tar(args: CommandLineArguments, workspace: str, run_build_script: bool,
 
     with complete_step('Creating archive'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(dir=os.path.dirname(args.output), prefix=".mkosi-"))
-        run(["tar", "-C", os.path.join(workspace, "root"),
-             "-c", "-J", "--xattrs", "--xattrs-include=*", "."],
-            stdout=f, check=True)
+        run_visible(["tar", "-C", os.path.join(workspace, "root"),
+                     "-c", "-J", "--xattrs", "--xattrs-include=*", "."],
+                    stdout=f, check=True)
 
     return f
 
 def make_squashfs(args: CommandLineArguments, workspace: str) -> BinaryIO:
     with complete_step('Creating squashfs file system'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(dir=os.path.dirname(args.output), prefix=".mkosi-squashfs"))
-        run(["mksquashfs", os.path.join(workspace, "root"), f.name, "-comp", "lz4", "-noappend"],
-            check=True)
+        run_visible(["mksquashfs", os.path.join(workspace, "root"), f.name, "-comp", "lz4", "-noappend"],
+                    check=True)
 
     return f
 
@@ -854,7 +854,7 @@ def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, pa
     print_step("Resizing disk image to {}...".format(format_bytes(new_size)))
 
     os.truncate(raw.name, new_size)
-    run(["losetup", "--set-capacity", loopdev], check=True)
+    run_visible(["losetup", "--set-capacity", loopdev], check=True)
 
     print_step("Inserting partition of {}...".format(format_bytes(blob_size)))
 
@@ -876,7 +876,7 @@ def insert_partition(args: CommandLineArguments, raw: BinaryIO, loopdev: str, pa
         dev = None
 
     try:
-        run(["dd", "if=" + blob.name, "of=" + (dev if dev is not None else ensured_partition(loopdev, partno))], check=True)
+        run_visible(["dd", "if=" + blob.name, "of=" + (dev if dev is not None else ensured_partition(loopdev, partno))], check=True)
     finally:
         luks_close(dev, "Closing LUKS root partition")
 
@@ -893,7 +893,7 @@ def make_verity(args: CommandLineArguments, dev: str) -> Tuple[BinaryIO, str]:
 
     with complete_step('Generating verity hashes'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(dir=os.path.dirname(args.output), prefix=".mkosi-"))
-        c = run(["veritysetup", "format", dev, f.name], stdout=PIPE, check=True)
+        c = run_visible(["veritysetup", "format", dev, f.name], stdout=PIPE, check=True)
 
         for line in c.stdout.decode("utf-8").split('\n'):
             if line.startswith("Root hash:"):
@@ -917,8 +917,8 @@ def patch_root_uuid(args: CommandLineArguments, loopdev: str, root_hash: str) ->
     u = uuid.UUID(root_hash[:32])
 
     with complete_step('Patching root partition UUID'):
-        run(["sfdisk", "--part-uuid", loopdev, str(args.root_partno), str(u)],
-            check=True)
+        run_visible(["sfdisk", "--part-uuid", loopdev, str(args.root_partno), str(u)],
+                    check=True)
 
 def install_unified_kernel(args: CommandLineArguments, workspace: str, run_build_script: bool, for_cache: bool, root_hash: Optional[str]) -> None:
 
@@ -1005,12 +1005,12 @@ def secure_boot_sign(args: CommandLineArguments, workspace: str, run_build_scrip
             with complete_step("Signing EFI binary {} in ESP".format(i)):
                 p = os.path.join(path, i)
 
-                run(["sbsign",
-                     "--key", args.secure_boot_key,
-                     "--cert", args.secure_boot_certificate,
-                     "--output", p + ".signed",
-                     p],
-                    check=True)
+                run_visible(["sbsign",
+                             "--key", args.secure_boot_key,
+                             "--cert", args.secure_boot_certificate,
+                             "--output", p + ".signed",
+                             p],
+                            check=True)
 
                 os.rename(p + ".signed", p)
 
@@ -1027,7 +1027,7 @@ def xz_output(args: CommandLineArguments, raw: Optional[BinaryIO]) -> Optional[B
 
     with complete_step('Compressing image file'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(prefix=".mkosi-", dir=os.path.dirname(args.output)))
-        run([xz_binary, "-c", raw.name], stdout=f, check=True)
+        run_visible([xz_binary, "-c", raw.name], stdout=f, check=True)
 
     return f
 
@@ -1042,7 +1042,7 @@ def qcow2_output(args: CommandLineArguments, raw: Optional[BinaryIO]) -> Optiona
 
     with complete_step('Converting image file to qcow2'):
         f: BinaryIO = cast(BinaryIO, tempfile.NamedTemporaryFile(prefix=".mkosi-", dir=os.path.dirname(args.output)))
-        run(["qemu-img", "convert", "-fraw", "-Oqcow2", raw.name, f.name], check=True)
+        run_visible(["qemu-img", "convert", "-fraw", "-Oqcow2", raw.name, f.name], check=True)
 
     return f
 
@@ -1121,7 +1121,7 @@ def calculate_signature(args: CommandLineArguments, checksum: Optional[TextIO]) 
             cmdline += ["--default-key", args.key]
 
         checksum.seek(0)
-        run(cmdline, stdin=checksum, stdout=f, check=True)
+        run_visible(cmdline, stdin=checksum, stdout=f, check=True)
 
     return f
 
@@ -1139,7 +1139,7 @@ def calculate_bmap(args: CommandLineArguments, raw: Optional[BinaryIO]) -> Optio
                                                              dir=os.path.dirname(args.output_bmap)))
 
         cmdline = ["bmaptool", "create", raw.name]
-        run(cmdline, stdout=f, check=True)
+        run_visible(cmdline, stdout=f, check=True)
 
     return f
 
@@ -1433,7 +1433,7 @@ def run_build_script(args: CommandLineArguments, workspace: str, raw: Optional[B
             cmdline.append("--private-network")
 
         cmdline.append("/root/" + os.path.basename(args.build_script))
-        run(cmdline, check=True)
+        run_visible(cmdline, check=True)
 
 def need_cache_images(args: CommandLineArguments) -> bool:
 

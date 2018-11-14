@@ -3,22 +3,21 @@
 import contextlib
 import os
 import uuid
-from subprocess import run
 from typing import Dict, Iterator, Optional, Tuple
 
 from .gpt import ensured_partition, partition
 from .types import CommandLineArguments, OutputFormat
-from .ui import complete_step
+from .ui import complete_step, run_visible
 
 
 def luks_format(dev: str, passphrase: Dict[str, str]) -> None:
 
     if passphrase['type'] == 'stdin':
         passphrase_content = (passphrase['content'] + "\n").encode("utf-8")
-        run(["cryptsetup", "luksFormat", "--batch-mode", dev], input=passphrase_content, check=True)
+        run_visible(["cryptsetup", "luksFormat", "--batch-mode", dev], input=passphrase_content, check=True)
     else:
         assert passphrase['type'] == 'file'
-        run(["cryptsetup", "luksFormat", "--batch-mode", dev, passphrase['content']], check=True)
+        run_visible(["cryptsetup", "luksFormat", "--batch-mode", dev, passphrase['content']], check=True)
 
 def luks_open(dev: str, passphrase: Dict[str, str]) -> str:
 
@@ -26,10 +25,10 @@ def luks_open(dev: str, passphrase: Dict[str, str]) -> str:
 
     if passphrase['type'] == 'stdin':
         passphrase_content = (passphrase['content'] + "\n").encode("utf-8")
-        run(["cryptsetup", "open", "--type", "luks", dev, name], input=passphrase_content, check=True)
+        run_visible(["cryptsetup", "open", "--type", "luks", dev, name], input=passphrase_content, check=True)
     else:
         assert passphrase['type'] == 'file'
-        run(["cryptsetup", "--key-file", passphrase['content'], "open", "--type", "luks", dev, name], check=True)
+        run_visible(["cryptsetup", "--key-file", passphrase['content'], "open", "--type", "luks", dev, name], check=True)
 
     return os.path.join("/dev/mapper", name)
 
@@ -38,7 +37,7 @@ def luks_close(dev: Optional[str], text: str) -> None:
         return
 
     with complete_step(text):
-        run(["cryptsetup", "close", dev], check=True)
+        run_visible(["cryptsetup", "close", dev], check=True)
 
 def luks_format_root(args: CommandLineArguments, loopdev: str, run_build_script: bool, cached: bool, inserting_squashfs: bool=False) -> None:
 

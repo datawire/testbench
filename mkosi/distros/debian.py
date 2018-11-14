@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: LGPL-2.1+
 
 import os
-from subprocess import run
 from typing import List, Optional
 
 from ..types import CommandLineArguments, OutputFormat
-from ..ui import complete_step
+from ..ui import complete_step, run_visible
 from ..utils import run_workspace_command
 
 PKG_CACHE = ['var/cache/apt/archives']
@@ -26,7 +25,7 @@ def debootstrap(args: CommandLineArguments, workspace: str, run_build_script: bo
     if args.bootable and args.output_format == OutputFormat.raw_btrfs:
         cmdline[4] += ",btrfs-tools"
 
-    run(cmdline, check=True)
+    run_visible(cmdline, check=True)
 
     # Work around debian bug #835628
     os.makedirs(os.path.join(workspace, "root/etc/dracut.conf.d"), exist_ok=True)

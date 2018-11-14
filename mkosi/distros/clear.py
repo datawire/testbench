@@ -2,12 +2,11 @@
 
 import os
 import shutil
-from subprocess import run
 from typing import List, Optional
 
 from ..gpt import ensured_partition
 from ..types import CommandLineArguments
-from ..ui import complete_step
+from ..ui import complete_step, run_visible
 from ..utils import run_workspace_command
 
 PKG_CACHE: List[str] = []
@@ -44,12 +43,12 @@ ensure that you have openssl program in your system.
 
     print("Using {}".format(swupd_extract))
 
-    run([swupd_extract,
-         '-output', root,
-         '-state', args.cache_path,
-         release,
-         *packages],
-        check=True)
+    run_visible([swupd_extract,
+                 '-output', root,
+                 '-state', args.cache_path,
+                 release,
+                 *packages],
+                check=True)
 
     os.symlink("../run/systemd/resolve/resolv.conf", os.path.join(root, "etc/resolv.conf"))
 

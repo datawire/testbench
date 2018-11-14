@@ -1,11 +1,10 @@
 # SPDX-License-Identifier: LGPL-2.1+
 
 import os
-from subprocess import run
 from typing import List, Optional
 
 from ..types import CommandLineArguments, OutputFormat
-from ..ui import complete_step
+from ..ui import complete_step, run_visible
 from .debian import install_boot_loader as install_boot_loader_debian
 
 PKG_CACHE = ['var/cache/zypp/packages']
@@ -38,8 +37,8 @@ def install(args: CommandLineArguments, workspace: str, run_build_script: bool) 
     # here to make sure that the package cache stays populated after
     # "zypper install".
     #
-    run(["zypper", "--root", root, "addrepo", "-ck", release_url, "Main"], check=True)
-    run(["zypper", "--root", root, "addrepo", "-ck", updates_url, "Updates"], check=True)
+    run_visible(["zypper", "--root", root, "addrepo", "-ck", release_url, "Main"], check=True)
+    run_visible(["zypper", "--root", root, "addrepo", "-ck", updates_url, "Updates"], check=True)
 
     if not args.with_docs:
         with open(os.path.join(root, "etc/zypp/zypp.conf"), "w") as f:
@@ -51,7 +50,7 @@ def install(args: CommandLineArguments, workspace: str, run_build_script: bool) 
     #
     # Install the "minimal" package set.
     #
-    run(cmdline + ["patterns-base-minimal_base"], check=True)
+    run_visible(cmdline + ["patterns-base-minimal_base"], check=True)
 
     #
     # Now install the additional packages if necessary.
@@ -73,14 +72,14 @@ def install(args: CommandLineArguments, workspace: str, run_build_script: bool) 
         extra_packages.extend(args.build_packages)
 
     if extra_packages:
-        run(cmdline + extra_packages, check=True)
+        run_visible(cmdline + extra_packages, check=True)
 
     #
     # Disable packages caching in the image that was enabled
     # previously to populate the package cache.
     #
-    run(["zypper", "--root", root, "modifyrepo", "-K", "Main"], check=True)
-    run(["zypper", "--root", root, "modifyrepo", "-K", "Updates"], check=True)
+    run_visible(["zypper", "--root", root, "modifyrepo", "-K", "Main"], check=True)
+    run_visible(["zypper", "--root", root, "modifyrepo", "-K", "Updates"], check=True)
 
     #
     # Tune dracut confs: openSUSE uses an old version of dracut that's

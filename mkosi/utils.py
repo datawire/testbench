@@ -10,13 +10,13 @@ from typing import Callable, Dict, List
 
 from .btrfs import btrfs_subvol_delete
 from .types import CommandLineArguments
-from .ui import die
+from .ui import die, run_visible
 
 
 def mount_bind(what: str, where: str) -> None:
     os.makedirs(what, 0o755, True)
     os.makedirs(where, 0o755, True)
-    run(["mount", "--bind", what, where], check=True)
+    run_visible(["mount", "--bind", what, where], check=True)
 
 def umount(where: str) -> None:
     # Ignore failures and error messages
@@ -58,7 +58,7 @@ def run_workspace_command(args: CommandLineArguments, workspace: str, *cmd: str,
         cmdline += nspawn_params
 
     cmdline += ['--', *cmd]
-    run(cmdline, check=True)
+    run_visible(cmdline, check=True)
 
 def check_if_url_exists(url: str) -> bool:
     req = urllib.request.Request(url, method="HEAD")

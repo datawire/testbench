@@ -10,9 +10,10 @@ import importlib
 import pickle
 import pkgutil
 from io import BytesIO
-from subprocess import run
 from types import ModuleType
-from typing import Any, BinaryIO, Callable, List, Optional
+from typing import Any, BinaryIO, Callable, List, Optional, Union
+
+from .ui import run_visible
 
 # The complement to serialize_module()/serialize_end() is the parser
 # in StreamImporter() in docker_stage2.py.
@@ -75,5 +76,9 @@ def run_in_docker(fn: Callable[..., None], args: List[Any]=[], docker_args: List
     stdin.write(("%s\n%s\n" % (fn.__module__, fn.__name__)).encode("utf-8"))
     pickle.dump(args, stdin)
 
-    run(["docker", "run", "--interactive"] + docker_args + ["gcr.io/datawireio/testbench-mkosi", "python3", "-c", stage1],
-        input=stdin.getvalue(), check=True)
+    cmdline: List[Union[bytes, str]] = [
+        "docker", "run", "--interactive", *docker_args,
+        "gcr.io/datawireio/testbench-mkosi",
+        "python3", "-c", stage1,
+    ]
+    run_visible(cmdline, input=stdin.getvalue(), check=True)
