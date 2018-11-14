@@ -1468,6 +1468,8 @@ def remove_artifacts(args: CommandLineArguments, workspace: str, raw: Optional[B
 
 def build_stuff(args: CommandLineArguments) -> None:
 
+    init_namespace(args)
+
     # Let's define a fixed machine ID for all our build-time
     # runs. We'll strip it off the final image, but some build-time
     # tools (dracut...) want a fixed one, hence provide one, and
@@ -1545,6 +1547,10 @@ def do(args: CommandLineArguments) -> None:
     check_output(args)
     summary.do(args)
     check_root()
-    init_namespace(args)
-    run_in_docker(build_stuff, [args])
+    run_in_docker(build_stuff, [args], docker_args=[
+        "--privileged",  # needs to (1) have access to loop devices, (2) be able to mount things
+        # "--volume={}".format(args.build_sources),
+        "--volume=/dev:/dev",  # https://github.com/moby/moby/issues/27886
+        "--volume={path}:{path}".format(path=os.path.dirname(args.output))
+    ])
     print_output_size(args)

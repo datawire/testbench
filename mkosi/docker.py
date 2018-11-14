@@ -45,7 +45,7 @@ def walk_package(package: ModuleType) -> List[str]:
 
     return [package.__name__] + members
 
-def run_in_docker(fn: Callable[..., None], args: List[Any]=[]) -> None:
+def run_in_docker(fn: Callable[..., None], args: List[Any]=[], docker_args: List[str]=[]) -> None:
 
     # We do this in multiple stages because: The first stage (whether
     # or not there are more after it) is sent over argv, which means
@@ -75,5 +75,5 @@ def run_in_docker(fn: Callable[..., None], args: List[Any]=[]) -> None:
     stdin.write(("%s\n%s\n" % (fn.__module__, fn.__name__)).encode("utf-8"))
     pickle.dump(args, stdin)
 
-    run(["docker", "run", "-i", "fedora", "python3", "-c", stage1],
+    run(["docker", "run", "--interactive"] + docker_args + ["gcr.io/datawireio/testbench-mkosi", "python3", "-c", stage1],
         input=stdin.getvalue(), check=True)
