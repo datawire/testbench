@@ -78,7 +78,7 @@ def run_in_docker(fn: Callable[..., None], args: List[Any]=[], docker_args: List
     pickle.dump(args, stdin)
 
     cmdline: List[Union[bytes, str]] = [
-        "docker", "run", "--interactive", *docker_args,
+        "docker", "run", "--interactive", "--rm", *docker_args,
         "gcr.io/datawireio/testbench-mkosi",
         "python3", "-c", stage1,
     ]

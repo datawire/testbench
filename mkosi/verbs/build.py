@@ -1490,6 +1490,9 @@ def build_stuff(args: CommandLineArguments) -> None:
 
     init_namespace(args)
 
+    # Ensure that the Docker container's machine-id is set up
+    run_visible(["systemd-machine-id-setup"], check=True)
+
     # Let's define a fixed machine ID for all our build-time
     # runs. We'll strip it off the final image, but some build-time
     # tools (dracut...) want a fixed one, hence provide one, and
@@ -1574,6 +1577,7 @@ def do(args: CommandLineArguments) -> None:
         "--privileged",  # needs to (1) have access to loop devices, (2) be able to mount things
         # "--volume={}".format(args.build_sources),
         "--volume=/dev:/dev",  # https://github.com/moby/moby/issues/27886
+        "--volume=/sys/fs/cgroup:/sys/fs/cgroup:ro",
         "--volume={path}:{path}".format(path=os.path.dirname(args.output))
     ])
     print_output_size(args)

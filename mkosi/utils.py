@@ -43,6 +43,7 @@ def run_workspace_command(args: CommandLineArguments, workspace: str, *cmd: str,
                "--machine=mkosi-" + uuid.uuid4().hex,
                "--as-pid2",
                "--register=no",
+               "--keep-unit",
                "--bind=" + var_tmp(workspace) + ":/var/tmp",
                "--setenv=SYSTEMD_OFFLINE=1" ]
 
