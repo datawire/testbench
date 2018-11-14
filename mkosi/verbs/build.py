@@ -1546,6 +1546,5 @@ def do(args: CommandLineArguments) -> None:
     summary.do(args)
     check_root()
     init_namespace(args)
-    run_in_docker(build_stuff, [args],
-                  ['mkosi', 'mkosi.btrfs', 'mkosi.cli', 'mkosi.distros', 'mkosi.gpt', 'mkosi.luks', 'mkosi.rpm', 'mkosi.types', 'mkosi.ui', 'mkosi.utils'])
+    run_in_docker(build_stuff, [args])
     print_output_size(args)

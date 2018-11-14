@@ -11,7 +11,10 @@ import pickle
 import pkgutil
 from io import BytesIO
 from subprocess import run
+from types import ModuleType
 from typing import Any, BinaryIO, Callable, List, Optional, Set
+
+from .pymodules import order_modules
 
 # The complement to serialize_module()/serialize_end() is
 # deserialize_all() in docker_inside.py.
@@ -31,9 +34,21 @@ def serialize_module(writer: BinaryIO, module_name: str) -> None:
 def serialize_end(writer: BinaryIO) -> None:
     writer.write(b'\n')
 
-def run_in_docker(fn: Callable[..., None], args: List[Any], module_names: List[str]=[]) -> None:
+def walk_and_order_package(package: ModuleType) -> List[str]:
+    # Assert that it is a package
+    assert hasattr(package, '__path__')
 
-    module_names = module_names + [fn.__module__]
+    # List the children of the package
+    members = [modinfo.name for modinfo in pkgutil.walk_packages(package.__path__, package.__name__+'.') if "docker_stage" not in modinfo.name]
+
+    # Don't incude things outside of the package
+    def predicate(module_name: str) -> bool:
+        return module_name == package.__name__ or module_name.startswith(package.__name__+'.')
+
+    return order_modules([package.__name__] + members, predicate)
+
+def run_in_docker(fn: Callable[..., None], args: List[Any]=[]) -> None:
+
 
     # We do this in multiple stages because: The first stage (whether
     # or not there are more after it) is sent over argv, which means
@@ -56,12 +71,8 @@ def run_in_docker(fn: Callable[..., None], args: List[Any], module_names: List[s
     # Send stage2 for stage1 to read
     stdin.write(stage2)
     # Send modules for stage2 to read
-    done: Set[str] = set()
-    for module_name in module_names:
-        if module_name in done:
-            continue
+    for module_name in walk_and_order_package(importlib.import_module(__package__)):
         serialize_module(stdin, module_name)
-        done.add(module_name)
     serialize_end(stdin)
     # Send function's __module__/__name__/arguments for stage2 to read
     stdin.write(("%s\n%s\n" % (fn.__module__, fn.__name__)).encode("utf-8"))
