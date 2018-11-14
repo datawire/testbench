@@ -185,17 +185,23 @@ def copy(oldpath: str, newpath: str) -> None:
 def init_namespace(args: CommandLineArguments) -> None:
     args.original_umask = os.umask(0o000)
     unshare(CLONE_NEWNS)
-    run_visible(["mount", "--make-rslave", "/"], check=True)
+    run_visible(["mount", "--verbose", "--make-rslave", "/"], check=True)
 
-def setup_workspace(args: CommandLineArguments) -> tempfile.TemporaryDirectory:
-    print_step("Setting up temporary workspace.")
-    if args.output_format in (OutputFormat.directory, OutputFormat.subvolume):
-        d = tempfile.TemporaryDirectory(dir=os.path.dirname(args.output), prefix='.mkosi-')
-    else:
-        d = tempfile.TemporaryDirectory(dir='/var/tmp', prefix='mkosi-')
+@contextlib.contextmanager
+def setup_workspace(args: CommandLineArguments) -> Iterator[str]:
+    with complete_step('Setting up temporary workspace',
+                       'Setting up temporary workspace {} complete') as output:
+        if args.output_format in (OutputFormat.directory, OutputFormat.subvolume):
+            d = tempfile.TemporaryDirectory(dir=os.path.dirname(args.output), prefix='.mkosi-')
+        else:
+            d = tempfile.TemporaryDirectory(dir='/var/tmp', prefix='mkosi-')
+            output.append(d.name)
 
-    print_step("Temporary workspace in " + d.name + " is now set up.")
-    return d
+    try:
+        yield d.name
+    finally:
+        with complete_step('Cleaning up temporary workspace {}'.format(d.name)):
+            d.cleanup()
 
 def image_size(args: CommandLineArguments) -> int:
     size = GPT_HEADER_SIZE + GPT_FOOTER_SIZE
@@ -363,16 +369,17 @@ def attach_image_loopback(args: CommandLineArguments, raw: Optional[BinaryIO]) -
         return
 
     with complete_step('Attaching image file',
-                       'Attached image file as {}') as output:
+                       'Attached image file {} as {}') as output:
         c = run_visible(["losetup", "--find", "--show", "--partscan", raw.name],
                         stdout=PIPE, check=True)
         loopdev = c.stdout.decode("utf-8").strip()
+        output.append(raw.name)
         output.append(loopdev)
 
     try:
         yield loopdev
     finally:
-        with complete_step('Detaching image file'):
+        with complete_step('Detaching image file {} from {}'.format(raw.name, loopdev)):
             run_visible(["losetup", "--detach", loopdev], check=True)
 
 def prepare_swap(args: CommandLineArguments, loopdev: Optional[str], cached: bool) -> None:
@@ -451,11 +458,11 @@ def mount_loop(args: CommandLineArguments, dev: str, where: str, read_only: bool
     if read_only:
         options += ",ro"
 
-    run_visible(["mount", "-n", dev, where, options], check=True)
+    run_visible(["mount", "--verbose", "-n", dev, where, options], check=True)
 
 def mount_tmpfs(where: str) -> None:
     os.makedirs(where, 0o755, True)
-    run_visible(["mount", "tmpfs", "-t", "tmpfs", where], check=True)
+    run_visible(["mount", "--verbose", "tmpfs", "-t", "tmpfs", where], check=True)
 
 @contextlib.contextmanager
 def mount_image(args: CommandLineArguments, workspace: str, loopdev: Optional[str], root_dev: Optional[str], home_dev: Optional[str], srv_dev: Optional[str], root_read_only: bool=False) -> Iterator[None]:
@@ -463,8 +470,8 @@ def mount_image(args: CommandLineArguments, workspace: str, loopdev: Optional[st
         yield None
         return
 
-    with complete_step('Mounting image'):
-        root = os.path.join(workspace, "root")
+    root = os.path.join(workspace, "root")
+    with complete_step('Mounting image at {}'.format(root)):
 
         if args.output_format != OutputFormat.raw_squashfs:
             mount_loop(args, root_dev, root, root_read_only)
@@ -485,7 +492,7 @@ def mount_image(args: CommandLineArguments, workspace: str, loopdev: Optional[st
     try:
         yield
     finally:
-        with complete_step('Unmounting image'):
+        with complete_step('Unmounting image at {}'.format(root)):
             umount(root)
 
 @complete_step("Assigning hostname")
@@ -512,18 +519,25 @@ def mount_cache(args: CommandLineArguments, workspace: str) -> Iterator[None]:
         return
 
     # We can't do this in mount_image() yet, as /var itself might have to be created as a subvolume first
-    with complete_step('Mounting Package Cache'):
-        cachedirs = distros.get_distro(args.distribution).PKG_CACHE
-        if len(cachedirs) == 1:
-            mount_bind(args.cache_path, os.path.join(workspace, "root", cachedirs[0]))
-        else:
-            for cachedir in cachedirs:
-                mount_bind(os.path.join(args.cache_path, os.path.basename(cachedir)), os.path.join(workspace, "root", cachedir))
+    mountpoints = []
     try:
-        yield
+        cachedirs = distros.get_distro(args.distribution).PKG_CACHE
+        with complete_step('Mounting Package Cache {}'.format(cachedirs)):
+            if len(cachedirs) == 1:
+                mountpoint = os.path.join(workspace, "root", cachedirs[0])
+                mount_bind(args.cache_path,
+                           mountpoint)
+                mountpoints.append(mountpoint)
+            else:
+                for cachedir in cachedirs:
+                    mountpoint = os.path.join(workspace, "root", cachedir)
+                    mount_bind(os.path.join(args.cache_path, os.path.basename(cachedir)),
+                               mountpoint)
+                    mountpoints.append(mountpoint)
+            yield
     finally:
-        with complete_step('Unmounting Package Cache'):
-            for d in distros.get_distro(args.distribution).PKG_CACHE:
+        with complete_step('Unmounting Package Cache {}'.format(cachedirs)):
+            for d in mountpoints:
                 umount(os.path.join(workspace, "root", d))
 
 @complete_step('Setting up basic OS tree')
@@ -1241,7 +1255,7 @@ def print_output_size(args: CommandLineArguments) -> None:
 def setup_package_cache(args: CommandLineArguments) -> Iterator[str]:
     d: Optional[tempfile.TemporaryDirectory] = None
     with complete_step('Setting up package cache',
-                       'Setting up package cache {} complete') as output:
+                       'Setting up package cache {} complete.') as output:
         if args.cache_path is None:
             d = tempfile.TemporaryDirectory(dir=os.path.dirname(args.output), prefix=".mkosi-")
             args.cache_path = d.name
@@ -1249,11 +1263,12 @@ def setup_package_cache(args: CommandLineArguments) -> Iterator[str]:
             os.makedirs(args.cache_path, 0o755, exist_ok=True)
         output.append(args.cache_path)
 
-    if d is not None:
-        with d as d_str:
-            yield d_str
-    else:
+    try:
         yield args.cache_path
+    finally:
+        if d is not None:
+            with complete_step('Cleaning up package cache {}'.format(d.name)):
+                d.cleanup()
 
 def check_output(args: CommandLineArguments) -> None:
     for f in (args.output,

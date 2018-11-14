@@ -16,11 +16,11 @@ from .ui import die, run_visible
 def mount_bind(what: str, where: str) -> None:
     os.makedirs(what, 0o755, True)
     os.makedirs(where, 0o755, True)
-    run_visible(["mount", "--bind", what, where], check=True)
+    run_visible(["mount", "--verbose", "--bind", what, where], check=True)
 
 def umount(where: str) -> None:
-    # Ignore failures and error messages
-    run(["umount", "--recursive", "-n", where], stdout=DEVNULL, stderr=DEVNULL)
+    # Ignore failures
+    run_visible(["umount", "--verbose", "--recursive", "-n", where])
 
 def patch_file(filepath: str, line_rewriter: Callable[[str], str]) -> None:
     temp_new_filepath = filepath + ".tmp.new"
