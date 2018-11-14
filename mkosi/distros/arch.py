@@ -44,15 +44,24 @@ def enable_networkmanager(workspace: str) -> None:
 
 @complete_step('Installing Arch Linux')
 def install(args: CommandLineArguments, workspace: str, run_build_script: bool) -> None:
+
     if args.release is not None:
         sys.stderr.write("Distribution release specification is not supported for Arch Linux, ignoring.\n")
+
+    root = os.path.join(workspace, "root")
+    try:
+        _install(args, workspace, run_build_script, root)
+    finally:
+        # At this point, no process should be left running, kill then
+        run_visible(["fuser", "-c", root, "--kill", "--verbose"])
+
+def _install(args: CommandLineArguments, workspace: str, run_build_script: bool, root: str) -> None:
 
     if platform.machine() == "aarch64":
         server = "Server = {}/$arch/$repo".format(args.mirror)
     else:
         server = "Server = {}/$repo/os/$arch".format(args.mirror)
 
-    root = os.path.join(workspace, "root")
     # Create base layout for pacman and pacman-key
     os.makedirs(os.path.join(root, "var/lib/pacman"), 0o755, exist_ok=True)
     os.makedirs(os.path.join(root, "etc/pacman.d/gnupg"), 0o755, exist_ok=True)
@@ -169,6 +178,7 @@ SigLevel    = Required DatabaseOptional
         run_pacstrap(packages)
 
     # Kill the gpg-agent used by pacman and pacman-key
+    # FIXME: This still leaves dirmngr running!
     run_visible(['gpg-connect-agent', '--homedir', os.path.join(root, 'etc/pacman.d/gnupg'), 'KILLAGENT', '/bye'])
 
     if "networkmanager" in args.packages:
@@ -183,9 +193,6 @@ SigLevel    = Required DatabaseOptional
 
     with open(os.path.join(workspace, 'root', 'etc/locale.conf'), 'w') as f:
         f.write('LANG=en_US.UTF-8\n')
-
-    # At this point, no process should be left running, kill then
-    run_visible(["fuser", "-c", root, "--kill"])
 
 def find_kernel_file(workspace_root: str, pattern: str) -> Optional[str]:
     # Look for the vmlinuz file in the workspace
