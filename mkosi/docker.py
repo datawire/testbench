@@ -9,6 +9,7 @@
 import importlib
 import pickle
 import pkgutil
+import sys
 from io import BytesIO
 from types import ModuleType
 from typing import Any, BinaryIO, Callable, List, Optional, Union
@@ -81,4 +82,6 @@ def run_in_docker(fn: Callable[..., None], args: List[Any]=[], docker_args: List
         "gcr.io/datawireio/testbench-mkosi",
         "python3", "-c", stage1,
     ]
-    run_visible(cmdline, input=stdin.getvalue(), check=True)
+    proc = run_visible(cmdline, input=stdin.getvalue())
+    if proc.returncode != 0:
+        sys.exit(proc.returncode)

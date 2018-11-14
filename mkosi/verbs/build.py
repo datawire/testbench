@@ -1237,7 +1237,8 @@ def print_output_size(args: CommandLineArguments) -> None:
         st = os.stat(args.output)
         print_step("Resulting image size is " + format_bytes(st.st_size) + ", consumes " + format_bytes(st.st_blocks * 512) + ".")
 
-def setup_package_cache(args: CommandLineArguments) -> Optional[tempfile.TemporaryDirectory]:
+@contextlib.contextmanager
+def setup_package_cache(args: CommandLineArguments) -> Iterator[str]:
     d: Optional[tempfile.TemporaryDirectory] = None
     with complete_step('Setting up package cache',
                        'Setting up package cache {} complete') as output:
@@ -1248,7 +1249,11 @@ def setup_package_cache(args: CommandLineArguments) -> Optional[tempfile.Tempora
             os.makedirs(args.cache_path, 0o755, exist_ok=True)
         output.append(args.cache_path)
 
-    return d
+    if d is not None:
+        with d as d_str:
+            yield d_str
+    else:
+        yield args.cache_path
 
 def check_output(args: CommandLineArguments) -> None:
     for f in (args.output,
@@ -1305,7 +1310,7 @@ def make_build_dir(args: CommandLineArguments) -> None:
 
     mkdir_last(args.build_dir, 0o755)
 
-def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirectory, run_build_script: bool, for_cache: bool=False) -> Tuple[Optional[BinaryIO], Optional[BinaryIO], Optional[str]]:
+def build_image(args: CommandLineArguments, workspace: str, run_build_script: bool, for_cache: bool=False) -> Tuple[Optional[BinaryIO], Optional[BinaryIO], Optional[str]]:
 
     # If there's no build script set, there's no point in executing
     # the build script iteration. Let's quit early.
@@ -1314,13 +1319,13 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
 
     make_build_dir(args)
 
-    raw, cached = reuse_cache_image(args, workspace.name, run_build_script, for_cache)
+    raw, cached = reuse_cache_image(args, workspace, run_build_script, for_cache)
     if for_cache and cached:
         # Found existing cache image, exiting build_image
         return None, None, None
 
     if not cached:
-        raw = create_image(args, workspace.name, for_cache)
+        raw = create_image(args, workspace, for_cache)
 
     with attach_image_loopback(args, raw) as loopdev:
 
@@ -1338,24 +1343,24 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
             prepare_home(args, encrypted_home, cached)
             prepare_srv(args, encrypted_srv, cached)
 
-            with mount_image(args, workspace.name, loopdev, encrypted_root, encrypted_home, encrypted_srv):
-                prepare_tree(args, workspace.name, run_build_script, cached)
+            with mount_image(args, workspace, loopdev, encrypted_root, encrypted_home, encrypted_srv):
+                prepare_tree(args, workspace, run_build_script, cached)
 
-                with mount_cache(args, workspace.name):
-                    cached = reuse_cache_tree(args, workspace.name, run_build_script, for_cache, cached)
-                    install_skeleton_trees(args, workspace.name, for_cache)
-                    install_distribution(args, workspace.name, run_build_script, cached)
-                    install_etc_hostname(args, workspace.name)
-                    install_boot_loader(args, workspace.name, loopdev, cached)
-                    install_extra_trees(args, workspace.name, for_cache)
-                    install_build_src(args, workspace.name, run_build_script, for_cache)
-                    install_build_dest(args, workspace.name, run_build_script, for_cache)
-                    set_root_password(args, workspace.name, run_build_script, for_cache)
-                    run_postinst_script(args, workspace.name, run_build_script, for_cache)
+                with mount_cache(args, workspace):
+                    cached = reuse_cache_tree(args, workspace, run_build_script, for_cache, cached)
+                    install_skeleton_trees(args, workspace, for_cache)
+                    install_distribution(args, workspace, run_build_script, cached)
+                    install_etc_hostname(args, workspace)
+                    install_boot_loader(args, workspace, loopdev, cached)
+                    install_extra_trees(args, workspace, for_cache)
+                    install_build_src(args, workspace, run_build_script, for_cache)
+                    install_build_dest(args, workspace, run_build_script, for_cache)
+                    set_root_password(args, workspace, run_build_script, for_cache)
+                    run_postinst_script(args, workspace, run_build_script, for_cache)
 
-                reset_machine_id(workspace.name, run_build_script, for_cache)
-                reset_random_seed(workspace.name)
-                make_read_only(args, workspace.name, for_cache)
+                reset_machine_id(workspace, run_build_script, for_cache)
+                reset_random_seed(workspace)
+                make_read_only(args, workspace, for_cache)
 
             root_hash: Optional[str] = None
             if not for_cache:
@@ -1365,7 +1370,7 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
                     # -> implies: loopdev is not None
                     assert raw is not None
                     assert loopdev is not None
-                    insert_squashfs(args, raw, loopdev, make_squashfs(args, workspace.name))
+                    insert_squashfs(args, raw, loopdev, make_squashfs(args, workspace))
 
                 if args.verity and not run_build_script:
                     # ???
@@ -1382,11 +1387,11 @@ def build_image(args: CommandLineArguments, workspace: tempfile.TemporaryDirecto
             # This time we mount read-only, as we already generated
             # the verity data, and hence really shouldn't modify the
             # image anymore.
-            with mount_image(args, workspace.name, loopdev, encrypted_root, encrypted_home, encrypted_srv, root_read_only=True):
-                install_unified_kernel(args, workspace.name, run_build_script, for_cache, root_hash)
-                secure_boot_sign(args, workspace.name, run_build_script, for_cache)
+            with mount_image(args, workspace, loopdev, encrypted_root, encrypted_home, encrypted_srv, root_read_only=True):
+                install_unified_kernel(args, workspace, run_build_script, for_cache, root_hash)
+                secure_boot_sign(args, workspace, run_build_script, for_cache)
 
-    tar = make_tar(args, workspace.name, run_build_script, for_cache)
+    tar = make_tar(args, workspace, run_build_script, for_cache)
 
     return raw, tar, root_hash
 
@@ -1477,8 +1482,11 @@ def build_stuff(args: CommandLineArguments) -> None:
     args.machine_id = uuid.uuid4().hex
 
     make_output_dir(args)
-    setup_package_cache(args)
-    workspace = setup_workspace(args)
+    with setup_package_cache(args):
+        with setup_workspace(args) as workspace:
+            _build_stuff(args, workspace)
+
+def _build_stuff(args: CommandLineArguments, workspace: str) -> None:
 
     # If caching is requested, then make sure we have cache images around we can make use of
     if need_cache_images(args):
@@ -1488,27 +1496,27 @@ def build_stuff(args: CommandLineArguments) -> None:
             # Generate the cache version of the build image, and store it as "cache-pre-dev"
             raw, tar, root_hash = build_image(args, workspace, run_build_script=True, for_cache=True)
             save_cache(args,
-                       workspace.name,
+                       workspace,
                        raw.name if raw is not None else None,
                        args.cache_pre_dev)
 
-            remove_artifacts(args, workspace.name, raw, tar, run_build_script=True)
+            remove_artifacts(args, workspace, raw, tar, run_build_script=True)
 
         # Generate the cache version of the build image, and store it as "cache-pre-inst"
         raw, tar, root_hash = build_image(args, workspace, run_build_script=False, for_cache=True)
         if raw:
             save_cache(args,
-                       workspace.name,
+                       workspace,
                        raw.name,
                        args.cache_pre_inst)
-            remove_artifacts(args, workspace.name, raw, tar, run_build_script=False)
+            remove_artifacts(args, workspace, raw, tar, run_build_script=False)
 
     if args.build_script:
         # Run the image builder for the first (develpoment) stage in preparation for the build script
         raw, tar, root_hash = build_image(args, workspace, run_build_script=True)
 
-        run_build_script(args, workspace.name, raw)
-        remove_artifacts(args, workspace.name, raw, tar, run_build_script=True)
+        run_build_script(args, workspace, raw)
+        remove_artifacts(args, workspace, raw, tar, run_build_script=True)
 
     # Run the image builder for the second (final) stage
     raw, tar, root_hash = build_image(args, workspace, run_build_script=False)
@@ -1522,7 +1530,7 @@ def build_stuff(args: CommandLineArguments) -> None:
     bmap = calculate_bmap(args, raw)
 
     link_output(args,
-                workspace.name,
+                workspace,
                 raw.name if raw is not None else None,
                 tar.name if tar is not None else None)
 
