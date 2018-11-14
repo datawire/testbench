@@ -12,9 +12,7 @@ import pkgutil
 from io import BytesIO
 from subprocess import run
 from types import ModuleType
-from typing import Any, BinaryIO, Callable, List, Optional, Set
-
-from .pymodules import order_modules
+from typing import Any, BinaryIO, Callable, List, Optional
 
 # The complement to serialize_module()/serialize_end() is
 # deserialize_all() in docker_inside.py.
@@ -24,31 +22,30 @@ def serialize_module(writer: BinaryIO, module_name: str) -> None:
     if spec is None:
         raise RuntimeError('Unknown module "%s".' % module_name)
     assert isinstance(spec.loader, importlib.abc.InspectLoader)
+
     body = spec.loader.get_source(module_name)
     assert body is not None
-    writer.write(b'%s\n%d\n%s' % (
-        module_name.encode('utf-8'),
-        len(body.encode('utf-8')),
-        body.encode('utf-8')))
+    encoded_body = body.encode('utf-8')
+
+    writer.write(b'%s\n%s\n%d\n%s' % (
+        module_name.encode('utf-8'),  # name
+        (b'False' if spec.submodule_search_locations is None else b'True'),  # is_package
+        len(encoded_body),  # len(body)
+        encoded_body))  # body
 
 def serialize_end(writer: BinaryIO) -> None:
     writer.write(b'\n')
 
-def walk_and_order_package(package: ModuleType) -> List[str]:
+def walk_package(package: ModuleType) -> List[str]:
     # Assert that it is a package
     assert hasattr(package, '__path__')
 
     # List the children of the package
     members = [modinfo.name for modinfo in pkgutil.walk_packages(package.__path__, package.__name__+'.') if "docker_stage" not in modinfo.name]
 
-    # Don't incude things outside of the package
-    def predicate(module_name: str) -> bool:
-        return module_name == package.__name__ or module_name.startswith(package.__name__+'.')
-
-    return order_modules([package.__name__] + members, predicate)
+    return [package.__name__] + members
 
 def run_in_docker(fn: Callable[..., None], args: List[Any]=[]) -> None:
-
 
     # We do this in multiple stages because: The first stage (whether
     # or not there are more after it) is sent over argv, which means
@@ -71,7 +68,7 @@ def run_in_docker(fn: Callable[..., None], args: List[Any]=[]) -> None:
     # Send stage2 for stage1 to read
     stdin.write(stage2)
     # Send modules for stage2 to read
-    for module_name in walk_and_order_package(importlib.import_module(__package__)):
+    for module_name in walk_package(importlib.import_module(__package__)):
         serialize_module(stdin, module_name)
     serialize_end(stdin)
     # Send function's __module__/__name__/arguments for stage2 to read

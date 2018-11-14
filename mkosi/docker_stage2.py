@@ -13,48 +13,47 @@ syntax-hightlights it, and flake8 lints it.
 
 """
 
-# Note that (unlike docker.py) this can use 'imp', because we never
-# interact with a "real" module loader.  That means the interpreter
-# will spit out:
-#
-#     DeprecationWarning: the imp module is deprecated in favour of importlib; see the module's documentation for alternative uses
-#
-# But that's OK for now.
-
-import imp
 import importlib
 import pickle
 import sys
-from typing import BinaryIO, cast
+from importlib import abc
+from importlib.machinery import ModuleSpec
+from types import ModuleType
+from typing import BinaryIO, Dict, Optional, Sequence, Tuple, Union, cast
 
 
-def deserialize_modules(reader: BinaryIO) -> None:
-    """deserialize_modules() is the complement to
-    serialize_module()/serialize_end() in docker.py
+class StreamImporter(abc.MetaPathFinder, abc.Loader):
+    sources: Dict[str, Tuple[bool, str]] = {}
 
-    """
-    while True:
-        # Read a module from the stream
-        name = reader.readline().strip().decode('utf-8')
-        if not name:
-            return
-        nbytes = int(reader.readline())
-        body = reader.read(nbytes).decode('utf-8')
+    def __init__(self, reader: BinaryIO):
+        self.origin = reader.name
 
-        # And hydrate that module in to the runtime
-        print("loading module %s" % repr(name))
-        module = imp.new_module(name)
-        parents = name.rsplit(".", 1)
-        if len(parents) == 2:
-            parent, parent_name = parents
-            setattr(sys.modules[parent], parent_name, module)
-        code = compile(body, name, "exec")
-        exec(code, module.__dict__)
-        sys.modules[name] = module
+        while True:
+            # Read a module from the stream
+            name = reader.readline().strip().decode('utf-8')
+            if not name:
+                return
+            is_pkg = reader.readline().strip().decode('utf-8') == 'True'
+            nbytes = int(reader.readline().strip().decode('utf-8'))
+            body = reader.read(nbytes).decode('utf-8')
+
+            self.sources[name] = (is_pkg, body)
+
+    def find_spec(self, fullname: str, path: Optional[Sequence[Union[bytes, str]]], target: Optional[ModuleType]=None) -> Optional[ModuleSpec]:
+        if fullname not in self.sources:
+            return None
+        is_package, source = self.sources[fullname]
+        spec = ModuleSpec(name=fullname, loader=self, origin=self.origin, is_package=is_package)
+        spec.has_location = False
+        return spec
+
+    def exec_module(self, module: ModuleType) -> None:
+        is_package, source = self.sources[module.__name__]
+        exec(compile(source, "{}:{}.py".format(self.origin, module.__name__), "exec"), module.__dict__)
 
 def stage2(reader: BinaryIO) -> None:
     # Load modules
-    deserialize_modules(reader)
+    sys.meta_path.insert(0, StreamImporter(reader))
     sys.stderr.flush()
     sys.stdout.flush()
     # Run command
@@ -63,6 +62,6 @@ def stage2(reader: BinaryIO) -> None:
     args = pickle.load(reader)
     importlib.import_module(module).__dict__[name](*args)
 
-# cast() is because we count on stage1 having already switched sys.stdin from
-# text-mode to binary-mode.
+# cast() is because we count on stage1 having already switched
+# sys.stdin from text-mode to binary-mode.
 stage2(cast(BinaryIO, sys.stdin))
