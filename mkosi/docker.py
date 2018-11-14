@@ -14,8 +14,8 @@ from subprocess import run
 from types import ModuleType
 from typing import Any, BinaryIO, Callable, List, Optional
 
-# The complement to serialize_module()/serialize_end() is
-# deserialize_all() in docker_inside.py.
+# The complement to serialize_module()/serialize_end() is the parser
+# in StreamImporter() in docker_stage2.py.
 
 def serialize_module(writer: BinaryIO, module_name: str) -> None:
     spec = importlib.util.find_spec(module_name)
