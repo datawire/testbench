@@ -5,7 +5,6 @@ import os.path
 import shutil
 import urllib.request
 import uuid
-from subprocess import DEVNULL, run
 from typing import Callable, Dict, List
 
 from .btrfs import btrfs_subvol_delete

@@ -53,7 +53,7 @@ def run(mountpoint: str, args: List[str]) -> None:
           "#!/bin/sh\n" + " ".join(shlex.quote(arg) for arg in args)+"\n",
           mode=0o755)
 
-def main():
+def main() -> None:
     import sys
     run(sys.argv[1], sys.argv[2:])
 
