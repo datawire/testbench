@@ -1,0 +1,6 @@
+#!/bin/sh
+useradd --create-home --comment 'testbench runner' --groups users testbench
+cat <<-EOT > /etc/sudoers.d/00-testbench
+	# SUDO_USERS HOSTS=(AS_USER) TAGS COMMANDS
+	testbench ALL=(ALL) NOPASSWD: ALL
+	EOT

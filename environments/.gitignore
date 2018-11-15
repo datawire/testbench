@@ -1,0 +1,2 @@
+*.mk
+*.extra/root/.kube/config
