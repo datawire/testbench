@@ -24,7 +24,7 @@ setup(
     scripts=['testbench'],
     entry_points={
         'console_scripts': [
-            'testbench-mkosi      = mkosi:main',
+            'testbench-mkosi      = mkosi.main:main',
             'testbench-tap-matrix = testbench_tap.matrix:main',
             'testbench-tap-run    = testbench_tap.run:main',
         ],

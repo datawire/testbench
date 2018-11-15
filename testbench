@@ -1,7 +1,7 @@
 #!/usr/bin/make -rRf
 
 KUBERNAUT ?= kubernaut
-MKOSI ?= sudo testbench-mkosi --cache /var/cache/pacman/pkg/
+MKOSI ?= sudo testbench-mkosi --cache $(CURDIR)/.testbench
 
 HOME ?= ~
 
@@ -18,7 +18,7 @@ run: testbench.html
 .PHONY: all
 
 testbench.html: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
-	python -m testbench.matrix $^ > $@
+	testbench-tap-matrix $^ > $@
 
 prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 .PHONY: prepare
@@ -54,7 +54,7 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 %.tap %.tap.osi: %.osi %.knaut FORCE
 	cp -T -- $*.osi $@.osi
 	$(MKOSI) --output $@.osi --default $*.mkosi withmount install -Dm644 $(abspath $*.knaut) root/.kube/config
-	$(MKOSI) --output $@.osi --default $*.mkosi withmount python3 -m testbench.run . $(CMD)
+	$(MKOSI) --output $@.osi --default $*.mkosi withmount testbench-tap-run . $(CMD)
 	$(MKOSI) --output $@.osi --default $*.mkosi qemu
 	$(MKOSI) --output $@.osi --default $*.mkosi withmount cp ./var/log/testbench-run.tap $(abspath $@)
 .PRECIOUS: %.tap.osi
