@@ -14,7 +14,7 @@ def write(fname: str, content: str, mode: int = 0o644) -> None:
     os.chmod(fname, mode)
 
 
-def main(mountpoint: str, args: List[str]) -> None:
+def run(mountpoint: str, args: List[str]) -> None:
     write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target'), """
         [Unit]
         Description=testbench-run target
@@ -53,7 +53,9 @@ def main(mountpoint: str, args: List[str]) -> None:
           "#!/bin/sh\n" + " ".join(shlex.quote(arg) for arg in args)+"\n",
           mode=0o755)
 
+def main():
+    import sys
+    run(sys.argv[1], sys.argv[2:])
 
 if __name__ == "__main__":
-    import sys
-    main(sys.argv[1], sys.argv[2:])
+    main()

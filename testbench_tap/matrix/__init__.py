@@ -1,11 +1,15 @@
 import html
+import pkgutil
 import sys
 from typing import Dict, List, Optional
 
-from .matrix_html import HEAD, TAIL
 from .tap import TestCase, TestStatus
 from .tap import parse as tap_parse
 
+HEAD = pkgutil.get_data(__package__, 'head.html')
+TAIL = pkgutil.get_data(__package__, 'tail.html')
+assert HEAD is not None
+assert TAIL is not None
 
 # mypy doesn't like html.escape()
 def html_escape(i: str, quote: bool) -> str:
@@ -56,7 +60,7 @@ def main() -> None:
         if len(prepend) > 0:
             file_errs[filename] = prepend + file_errs[filename]
 
-    # Now print everyting
+    # Now print everything
     print(HEAD)
     print("<table>")
     # The table header
@@ -94,7 +98,3 @@ def main() -> None:
     print("</pre>")
     # End document
     print(TAIL)
-
-
-if __name__ == "__main__":
-    main()
