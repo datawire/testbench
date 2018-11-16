@@ -89,10 +89,11 @@ def main() -> None:
     # End table
     print("</table>")
     # Display any errors
-    print("<pre>")
-    for filename in filenames:
-        for err in file_errs[filename]:
-            print(html_escape(err, quote=False))
-    print("</pre>")
+    if any(len(errs) > 0 for _, errs in file_errs.items()):
+        print("<pre>")
+        for filename in filenames:
+            for err in file_errs[filename]:
+                print(html_escape(err, quote=False))
+        print("</pre>")
     # End document
     print(TAIL)

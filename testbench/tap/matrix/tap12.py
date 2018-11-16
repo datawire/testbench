@@ -84,4 +84,11 @@ def parse(reader: TextIO) -> Tuple[Dict[int, TestCase], List[str]]:
             for i in range(1, plan+1):
                 trunc[i] = tests[i]
             tests = trunc
+    if plan is None and len(tests) == 0:
+        # Any old file that isn't TAP will parse as "valid" TAP 12
+        # with 0 tests, since all headers are optional, and unknown
+        # lines are ignored.  So, as a special case to achieve sane
+        # behavior (but in violation of the spec): require a test plan
+        # if there are 0 tests.
+        error("Does not appear to be a TAP file: no TAP version, no test plan, no test lines")
     return tests, errs
