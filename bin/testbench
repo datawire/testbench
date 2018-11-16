@@ -19,7 +19,8 @@ all: run
 .PHONY: all
 
 run: testbench.html
-.PHONY: all
+	python3 -c 'import webbrowser; webbrowser.open_new("./testbench.html")'
+.PHONY: run
 
 testbench.html: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
 	testbench-tap-matrix $^ > $@
