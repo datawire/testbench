@@ -6,10 +6,8 @@ from typing import Dict, List, Optional
 from .tap import TestCase, TestStatus
 from .tap import parse as tap_parse
 
-HEAD = pkgutil.get_data(__package__, 'head.html')
-TAIL = pkgutil.get_data(__package__, 'tail.html')
-assert HEAD is not None
-assert TAIL is not None
+HEAD = pkgutil.get_data(__package__, 'head.html').decode('utf-8')
+TAIL = pkgutil.get_data(__package__, 'tail.html').decode('utf-8')
 
 # mypy doesn't like html.escape()
 def html_escape(i: str, quote: bool) -> str:
