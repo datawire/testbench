@@ -18,14 +18,12 @@ setup(
 
     packages=find_packages(),
     package_data={
-        'testbench_tap.matrix': ['*.html'],
+        'testbench.tap.matrix': ['*.html'],
     },
-    scripts=['testbench'],
-    entry_points={
-        'console_scripts': [
-            'testbench-mkosi      = mkosi.main:main',
-            'testbench-tap-matrix = testbench_tap.matrix:main',
-            'testbench-tap-run    = testbench_tap.run:main',
-        ],
-    },
+    scripts=[
+        'bin/testbench',
+        'bin/testbench-mkosi',
+        'bin/testbench-tap-matrix',
+        'bin/testbench-tap-run',
+    ],
 )

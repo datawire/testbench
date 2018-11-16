@@ -42,7 +42,8 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 
 # Generic mkosi rules
 %.mk: %.mkosi FORCE
-	@echo $*.osi: $(sort $(shell find $(wildcard $*.mkosi $*.postinst $*.extra))) | ./write-ifchanged $@
+	@echo $*.osi: $(sort $(shell find $(wildcard $*.mkosi $*.postinst $*.extra))) > $(@D)/.tmp.$(@F).tmp
+	@if cmf -s $(@D)/.tmp.$(@F).tmp $@; then rm -f $(@D)/.tmp.$(@F).tmp; else mv -f $(@D)/.tmp.$(@F).tmp $@; fi
 -include environments/*.mk
 %.osi: %.mkosi %.mk
 	$(MKOSI) --force \

@@ -96,6 +96,3 @@ def main() -> None:
         verbs.get_verb("build").do(args)
 
     verb.do(args)
-
-if __name__ == "__main__":
-    main()

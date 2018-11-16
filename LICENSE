@@ -1,16 +1,10 @@
 There are several licenses used in this repository/distribution/egg.
 
-All files under the `./mkosi/` directory are licensed under the terms
-of the GNU Lessor General Public license as published by the
+All files under the `./testbench/mkosi/` directory are licensed under
+the terms of the GNU Lessor General Public license as published by the
 Free Software Foundation, either version 2.1 of the License, or (at
 your option) any later version.  The full text of the license is
 included in the `./LICENSE.lgpl-2.1.txt` file.
-
-The `./write-ifchanged` fileis licensed under the terms of the
-GNU Affero General Public license as published by the
-Free Software Foundation, either version 3 of the License, or (at your
-option) any later version.  The full text of the license is
-included in the `./LICENSE.agpl-3.txt` file.
 
 Unless otherwise specified, all other files are proprietary to
 Datawire.
