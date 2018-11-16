@@ -1,0 +1,20 @@
+FROM docker.io/fedora
+
+USER root
+RUN dnf -y update
+RUN dnf -y install wget rpm-build 'dnf-command(builddep)'
+RUN useradd --create-home --user-group --group users mockbuild
+WORKDIR /home/mockbuild
+RUN wget https://dl.fedoraproject.org/pub/fedora/linux/updates/29/Everything/SRPMS/Packages/s/systemd-239-6.git9f3aed1.fc29.src.rpm
+RUN dnf -y builddep systemd-239-6.git9f3aed1.fc29.src.rpm
+
+USER mockbuild
+RUN rpm -i systemd-239-6.git9f3aed1.fc29.src.rpm
+# Adjust which systemd-stable commit we build from
+RUN sed -i -e s/9f3aed1c7d20c12cc932b81e127d48edf855f36c/6b4878d667737b523ea251f2d8abde9748bb295e/ -- rpmbuild/SPECS/systemd.spec
+# Mark the RPM as being for testbench, not for fc29
+RUN sed -i -e 1i'%global dist .testbench' -- rpmbuild/SPECS/systemd.spec
+# Disable running the tests--some of them don't work in Docker
+RUN sed -i -e /%meson_test/d  -- rpmbuild/SPECS/systemd.spec
+# Finally, build the thing
+RUN rpmbuild --undefine=_disable_source_fetch -bb rpmbuild/SPECS/systemd.spec

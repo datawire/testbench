@@ -8,6 +8,8 @@ lint:
 DOCKER_IMAGE = gcr.io/datawireio/testbench-mkosi
 
 docker-image:
+	docker build -t testbench-mkosi-build -f docker/Dockerfile.build docker/
+	docker run --rm --volume $(CURDIR)/docker:/dest testbench-mkosi-build sh -c 'cp -t /dest -- rpmbuild/RPMS/x86_64/*'
 	docker build -t $(DOCKER_IMAGE) docker/
 docker-push:
 	docker push $(DOCKER_IMAGE)
