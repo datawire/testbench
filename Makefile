@@ -2,7 +2,7 @@ SHELL = bash
 
 lint:
 	flake8 | tee >(wc -l)
-	mypy --strict mkosi testbench_tap | grep -v -e 'GeneratorContextManager' | tee >(wc -l)
+	mypy --strict testbench | grep -v -e 'GeneratorContextManager' | tee >(wc -l)
 .PHONY: lint
 
 DOCKER_IMAGE = gcr.io/datawireio/testbench-mkosi
