@@ -8,6 +8,7 @@ from ..ui import format_bytes
 
 NEEDS_ROOT = False
 NEEDS_BUILD = False
+FORCE_UNLINKS = False
 
 def yes_no(b: bool) -> str:
     return "yes" if b else "no"

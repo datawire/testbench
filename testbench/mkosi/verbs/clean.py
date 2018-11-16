@@ -2,8 +2,9 @@
 
 from ..types import CommandLineArguments
 
-NEEDS_ROOT = True
+NEEDS_ROOT = False
 NEEDS_BUILD = False
+FORCE_UNLINKS = True
 
 def do(args: CommandLineArguments) -> None:
     pass

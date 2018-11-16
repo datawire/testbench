@@ -10,8 +10,9 @@ from typing import Iterable, List
 from ..types import CommandLineArguments
 from ..ui import die
 
-NEEDS_ROOT = True
+NEEDS_ROOT = False
 NEEDS_BUILD = True
+FORCE_UNLINKS = True
 
 def print_running_cmd(cmdline: Iterable[str]) -> None:
     sys.stderr.write("‣ \033[0;1;39mRunning command:\033[0m\n")

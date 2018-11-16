@@ -6,6 +6,7 @@ from ..types import CommandLineArguments, OutputFormat
 
 NEEDS_ROOT = True
 NEEDS_BUILD = True
+FORCE_UNLINKS = True
 
 def do(args: CommandLineArguments) -> None:
     target = "--directory=" + args.output if args.output_format in (OutputFormat.directory, OutputFormat.subvolume) else "--image=" + args.output

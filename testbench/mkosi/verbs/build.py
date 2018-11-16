@@ -58,8 +58,9 @@ from ..utils import (
     var_tmp,
 )
 
-NEEDS_ROOT = True
+NEEDS_ROOT = False
 NEEDS_BUILD = False
+FORCE_UNLINKS = True
 
 CLONE_NEWNS = 0x00020000
 
@@ -1572,7 +1573,6 @@ def _build_stuff(args: CommandLineArguments, workspace: str) -> None:
 def do(args: CommandLineArguments) -> None:
     check_output(args)
     summary.do(args)
-    check_root()
 
     dirs = [
         args.build_sources,

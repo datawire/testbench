@@ -15,6 +15,7 @@ from .build import (
 
 NEEDS_ROOT = True
 NEEDS_BUILD = True
+FORCE_UNLINKS = True
 
 def do(args: CommandLineArguments) -> None:
     init_namespace(args)

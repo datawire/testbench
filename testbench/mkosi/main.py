@@ -88,9 +88,10 @@ def main() -> None:
 
     if verb.NEEDS_ROOT:
         check_root()
-        unlink_output(args)  # XXX
+    if verb.FORCE_UNLINKS:
+        unlink_output(args)
 
-    prepend_to_environ_path(args.extra_search_paths)  # XXX
+    prepend_to_environ_path(args.extra_search_paths)
 
     if not os.path.exists(args.output) and verb.NEEDS_BUILD:
         verbs.get_verb("build").do(args)

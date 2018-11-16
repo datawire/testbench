@@ -8,8 +8,9 @@ from ..types import CommandLineArguments
 
 
 class Verb:  # Inherit from typing.Protocol, once it's available
-    NEEDS_BUILD: bool
     NEEDS_ROOT: bool
+    NEEDS_BUILD: bool
+    FORCE_UNLINKS: bool
 
     @staticmethod
     def do(args: CommandLineArguments) -> None:
