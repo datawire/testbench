@@ -1,7 +1,8 @@
 #!/usr/bin/make -rRf
 
 KUBERNAUT ?= kubernaut
-MKOSI ?= sudo testbench-mkosi --cache $(CURDIR)/.testbench
+SUDO ?= sudo env PYTHONPATH=$(shell python3 -c 'import sys; print(":".join(sys.path))')
+MKOSI ?= $(SUDO) testbench-mkosi --cache=$(CURDIR)/.testbench
 
 HOME ?= ~
 
@@ -9,6 +10,9 @@ HOME ?= ~
 
 ifeq ($(CMD),)
 $(error Must specify a CMD=)
+endif
+ifeq ($(wildcard environments/*.mkosi),)
+$(error Must define environments in ./environments/*.mkosi)
 endif
 
 all: run
@@ -43,8 +47,8 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 # Generic mkosi rules
 %.mk: %.mkosi FORCE
 	@echo $*.osi: $(sort $(shell find $(wildcard $*.mkosi $*.postinst $*.extra))) > $(@D)/.tmp.$(@F).tmp
-	@if cmf -s $(@D)/.tmp.$(@F).tmp $@; then rm -f $(@D)/.tmp.$(@F).tmp; else mv -f $(@D)/.tmp.$(@F).tmp $@; fi
--include environments/*.mk
+	@if cmp -s $(@D)/.tmp.$(@F).tmp $@; then rm -f $(@D)/.tmp.$(@F).tmp; else mv -f $(@D)/.tmp.$(@F).tmp $@; fi
+-include $(wildcard environments/*.mk)
 %.osi: %.mkosi %.mk
 	$(MKOSI) --force \
 	  --output $@ \

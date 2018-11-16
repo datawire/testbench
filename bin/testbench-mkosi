@@ -1,2 +1,2 @@
 #!/bin/sh
-python3 -m testbench.mkosi
+exec python3 -m testbench.mkosi "$@"

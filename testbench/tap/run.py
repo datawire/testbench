@@ -5,7 +5,7 @@ from typing import List
 
 # Kinda like Bash <<-'EOT' here-docs
 def trim(s: str) -> str:
-    return "\n".join([line.lstrip("\t") for line in str.lstrip("\n").split("\n")])
+    return "\n".join([line.lstrip("\t") for line in s.lstrip("\n").split("\n")])
 
 
 def write(fname: str, content: str, mode: int = 0o644) -> None:

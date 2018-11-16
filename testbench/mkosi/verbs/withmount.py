@@ -19,9 +19,9 @@ NEEDS_BUILD = True
 def do(args: CommandLineArguments) -> None:
     init_namespace(args)
     determine_partition_table(args)
-    workspace = setup_workspace(args)
-    with open(args.output, 'rb') as raw:
-        with attach_image_loopback(args, raw) as loopdev:
-            with luks_setup_all(args, loopdev, False) as (encrypted_root, encrypted_home, encrypted_srv):
-                with mount_image(args, workspace.name, loopdev, encrypted_root, encrypted_home, encrypted_srv):
-                    run_visible(args.cmdline, cwd=os.path.join(workspace.name, "root"), check=True)
+    with setup_workspace(args) as workspace:
+        with open(args.output, 'rb') as raw:
+            with attach_image_loopback(args, raw) as loopdev:
+                with luks_setup_all(args, loopdev, False) as (encrypted_root, encrypted_home, encrypted_srv):
+                    with mount_image(args, workspace, loopdev, encrypted_root, encrypted_home, encrypted_srv):
+                        run_visible(args.cmdline, cwd=os.path.join(workspace, "root"), check=True)

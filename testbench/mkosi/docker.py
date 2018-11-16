@@ -45,7 +45,13 @@ def walk_package(package: ModuleType) -> List[str]:
     # List the children of the package
     members = [modinfo.name for modinfo in pkgutil.walk_packages(package.__path__, package.__name__+'.') if "docker_stage" not in modinfo.name]
 
-    return [package.__name__] + members
+    # List the parents of the package (we can't import 'foo.bar.baz'
+    # without having 'foo')
+    ancestry = [package.__name__]
+    while '.' in ancestry[-1]:
+        ancestry.append(ancestry[-1].rsplit('.', 1)[0])
+
+    return ancestry + members
 
 def run_in_docker(fn: Callable[..., None], args: List[Any]=[], docker_args: List[str]=[]) -> None:
 

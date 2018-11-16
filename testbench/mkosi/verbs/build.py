@@ -1255,7 +1255,7 @@ def print_output_size(args: CommandLineArguments) -> None:
 def setup_package_cache(args: CommandLineArguments) -> Iterator[str]:
     d: Optional[tempfile.TemporaryDirectory] = None
     with complete_step('Setting up package cache',
-                       'Setting up package cache {} complete.') as output:
+                       'Setting up package cache {} complete') as output:
         if args.cache_path is None:
             d = tempfile.TemporaryDirectory(dir=os.path.dirname(args.output), prefix=".mkosi-")
             args.cache_path = d.name
@@ -1573,11 +1573,21 @@ def do(args: CommandLineArguments) -> None:
     check_output(args)
     summary.do(args)
     check_root()
+
+    dirs = [
+        args.build_sources,
+        args.cache_path,
+        os.path.dirname(args.output),
+    ]
+    # Normalize
+    dirs = [os.path.abspath(d) for d in dirs if d is not None]
+    # Filter duplicates/subdirs
+    dirs = [x for x in dirs if not any(x.startswith(y+'/') for y in dirs)]
+
     run_in_docker(build_stuff, [args], docker_args=[
         "--privileged",  # needs to (1) have access to loop devices, (2) be able to mount things
-        # "--volume={}".format(args.build_sources),
         "--volume=/dev:/dev",  # https://github.com/moby/moby/issues/27886
         "--volume=/sys/fs/cgroup:/sys/fs/cgroup:ro",
-        "--volume={path}:{path}".format(path=os.path.dirname(args.output))
+        *["--volume={path}:{path}".format(path=x) for x in dirs]
     ])
     print_output_size(args)

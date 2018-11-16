@@ -1,2 +1,2 @@
 #!/bin/sh
-python3 -m testbench.tap.run
+exec python3 -m testbench.tap.run "$@"
