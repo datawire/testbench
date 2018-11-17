@@ -2,7 +2,7 @@
 
 KUBERNAUT ?= kubernaut
 SUDO ?= sudo env PYTHONPATH=$(shell python3 -c 'import sys; print(":".join(sys.path))')
-MKOSI ?= testbench-mkosi --cache=$(CURDIR)/.testbench
+MKOSI ?= testbench-mkosi
 
 HOME ?= ~
 
@@ -50,7 +50,7 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 	@echo $*.osi: $(sort $(shell find $(wildcard $*.mkosi $*.postinst $*.extra))) > $(@D)/.tmp.$(@F).tmp
 	@if cmp -s $(@D)/.tmp.$(@F).tmp $@; then rm -f $(@D)/.tmp.$(@F).tmp; else mv -f $(@D)/.tmp.$(@F).tmp $@; fi
 -include $(wildcard environments/*.mk)
-%.osi: %.mkosi %.mk
+%.osi: %.mkosi %.mk | mkosi.cache
 	$(MKOSI) --force \
 	  --output $@ \
 	  --default $*.mkosi \
@@ -64,3 +64,6 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 	$(MKOSI) --output $@.osi --default $*.mkosi qemu
 	$(SUDO) $(MKOSI) --output $@.osi --default $*.mkosi withmount cp ./var/log/testbench-run.tap $(abspath $@)
 .PRECIOUS: %.tap.osi
+
+mkosi.cache:
+	mkdir mkosi.cache
