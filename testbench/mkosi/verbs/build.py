@@ -48,7 +48,6 @@ from ..types import (
 )
 from ..ui import complete_step, die, format_bytes, print_step, run_visible
 from ..utils import (
-    check_root,
     mkdir_last,
     mount_bind,
     patch_file,
