@@ -1,7 +1,6 @@
 #!/usr/bin/make -rRf
 
 KUBERNAUT ?= kubernaut
-SUDO ?= sudo env PYTHONPATH=$(shell python3 -c 'import sys; print(":".join(sys.path))')
 MKOSI ?= testbench-mkosi
 
 HOME ?= ~
@@ -59,10 +58,9 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 
 %.tap %.tap.osi: %.osi %.knaut FORCE
 	cp -T -- $*.osi $@.osi
-	$(SUDO) $(MKOSI) --output $@.osi --default $*.mkosi withmount install -Dm644 $(abspath $*.knaut) root/.kube/config
-	$(SUDO) $(MKOSI) --output $@.osi --default $*.mkosi withmount testbench-tap-run . $(CMD)
-	$(MKOSI) --output $@.osi --default $*.mkosi qemu
-	$(SUDO) $(MKOSI) --output $@.osi --default $*.mkosi withmount cp ./var/log/testbench-run.tap $(abspath $@)
+	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD tap-setup $(CMD)
+	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu
+	$(MKOSI) --output=$@.osi --default=$*.mkosi tap-teardown
 .PRECIOUS: %.tap.osi
 
 mkosi.cache:

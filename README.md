@@ -11,7 +11,6 @@ Requirements:
  - GNU Make as `/usr/bin/make`
  - OVMF
  - `kubernaut`
- - `sudo`
  - Only runs on x86_64 hosts
 
 Requirements of `testbench-mkosi withmount`:

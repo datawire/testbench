@@ -796,6 +796,7 @@ def install_build_src(args: CommandLineArguments, workspace: str, run_build_scri
                 copy_git_files(args.build_sources, target, git_files=args.git_files)
             else:
                 ignore = shutil.ignore_patterns('.git',
+                                                'environments',
                                                 '.mkosi-*',
                                                 '*.cache-pre-dev',
                                                 '*.cache-pre-inst',
