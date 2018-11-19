@@ -779,15 +779,15 @@ def install_build_src(args: CommandLineArguments, workspace: str, run_build_scri
     if for_cache:
         return
 
-    if args.build_script is None:
-        return
+    #if args.build_script is None:
+    #    return
 
     with complete_step('Copying in build script and sources'):
-        copy_file(args.build_script,
-                  os.path.join(workspace, "root", "root", os.path.basename(args.build_script)))
+        #copy_file(args.build_script,
+        #          os.path.join(workspace, "root", "root", os.path.basename(args.build_script)))
 
         if args.build_sources is not None:
-            target = os.path.join(workspace, "root", "root/src")
+            target = os.path.join(workspace, "root", "home/testbench/src")
             use_git = args.use_git_files
             if use_git is None:
                 use_git = os.path.exists('.git') or os.path.exists(os.path.join(args.build_sources, '.git'))

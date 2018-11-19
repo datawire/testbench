@@ -3,6 +3,7 @@
 import os
 import shlex
 import shutil
+import uuid
 
 from ..docker import run_in_docker
 from ..luks import luks_setup_all
@@ -24,7 +25,7 @@ FORCE_UNLINKS = True
 
 # Kinda like Bash <<-'EOT' here-docs
 def trim(s: str) -> str:
-    return "\n".join([line.lstrip("\t") for line in s.lstrip("\n").split("\n")])
+    return "\n".join([line.lstrip("\t ") for line in s.lstrip("\n").split("\n")])
 
 
 def write(fname: str, content: str, mode: int = 0o644) -> None:
@@ -34,12 +35,16 @@ def write(fname: str, content: str, mode: int = 0o644) -> None:
 
 
 def setup(args: CommandLineArguments, workspace: str, mountpoint: str) -> None:
-    run_workspace_command(args, os.path.dirname(mountpoint),
+    run_workspace_command(args, workspace,
                           "useradd",
                           "--create-home",
                           "--comment", "testbench runner",
                           "--groups", "users",
                           "testbench")
+    # Some distros lock new accounts by default (probably smart), make
+    # sure testbench is unlocked.
+    run_workspace_command(args, workspace,
+                          "passwd", "--delete", "testbench")
 
     write(os.path.join(mountpoint, 'etc/sudoers.d/00-testbench'), """
         # SUDO_USERS HOSTS=(AS_USER) TAGS COMMANDS
@@ -65,7 +70,7 @@ def setup(args: CommandLineArguments, workspace: str, mountpoint: str) -> None:
 
         [Service]
         User=testbench
-        WorkingDirectory=/home/testbench
+        WorkingDirectory=/home/testbench/src
         ExecStart=/etc/testbench-run
         StandardOutput=file:/var/log/testbench-run.tap
         ExecStopPost=+/bin/sh -c 'rm -f /etc/testbench-run; systemctl poweroff --no-block'
@@ -92,8 +97,11 @@ def setup(args: CommandLineArguments, workspace: str, mountpoint: str) -> None:
                 os.path.join(mountpoint, "home/testbench/.kube/config"))
 
     install_build_src(args, workspace, True, False)
+    run_workspace_command(args, workspace,
+                          "chown", "-R", "testbench:", "/home/testbench/src")
 
 def do_inner(args: CommandLineArguments) -> None:
+    args.machine_id = uuid.uuid4().hex
     init_namespace(args)
     determine_partition_table(args)
     with setup_workspace(args) as workspace:

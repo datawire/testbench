@@ -5,7 +5,8 @@ RUN dnf -y update
 # HAHA, NOPE!  The upstream list is missing:
 # - 'systemd-container' (for systemd-nspawn)
 # - 'psmisc' (for fuser)
-RUN dnf -y install arch-install-scripts btrfs-progs debootstrap dosfstools edk2-ovmf e2fsprogs squashfs-tools gnupg python3 tar veritysetup xfsprogs xz zypper systemd-container psmisc
+# - 'git' (for 'git ls-files')
+RUN dnf -y install arch-install-scripts btrfs-progs debootstrap dosfstools edk2-ovmf e2fsprogs squashfs-tools gnupg python3 tar veritysetup xfsprogs xz zypper systemd-container psmisc git
 # Load in our patched systemd-nspawn, to work around Fedora's being
 # broken https://github.com/systemd/mkosi/issues/280
 ADD *.rpm ./

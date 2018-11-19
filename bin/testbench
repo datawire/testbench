@@ -58,7 +58,7 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 
 %.tap %.tap.osi: %.osi %.knaut FORCE
 	cp -T -- $*.osi $@.osi
-	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD tap-setup $(CMD)
+	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup $(CMD)
 	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu
 	$(MKOSI) --output=$@.osi --default=$*.mkosi tap-teardown
 .PRECIOUS: %.tap.osi

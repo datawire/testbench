@@ -32,5 +32,5 @@ def osi_mount(args: CommandLineArguments) -> Iterator[str]:
 
 def do(args: CommandLineArguments) -> None:
     init_namespace(args)
-    with osi_mount as mountpoint:
+    with osi_mount(args) as mountpoint:
         run_visible(args.cmdline, cwd=mountpoint, check=True)
