@@ -51,10 +51,10 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 -include $(wildcard environments/*.mk)
 %.osi: %.mkosi %.mk | mkosi.cache
 	$(MKOSI) --force \
-	  --output $@ \
-	  --default $*.mkosi \
-	  $(if $(wildcard $*.postinst),--postinst-script $*.postinst) \
-	  $(if $(wildcard $*.extra),--extra-tree $*.extra)
+	  --output=$@ \
+	  --default=$*.mkosi \
+	  $(if $(wildcard $*.postinst),--postinst-script=$*.postinst) \
+	  $(if $(wildcard $*.extra),--extra-tree=$*.extra)
 
 %.tap %.tap.osi: %.osi %.knaut FORCE
 	cp -T -- $*.osi $@.osi
