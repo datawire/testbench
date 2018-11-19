@@ -10,6 +10,7 @@ from ..types import CommandLineArguments
 class Verb:  # Inherit from typing.Protocol, once it's available
     NEEDS_ROOT: bool
     NEEDS_BUILD: bool
+    HAS_ARGS: bool
     FORCE_UNLINKS: bool
 
     @staticmethod

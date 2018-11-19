@@ -60,6 +60,7 @@ from ..utils import (
 
 NEEDS_ROOT = False
 NEEDS_BUILD = False
+HAS_ARGS = False
 FORCE_UNLINKS = True
 
 CLONE_NEWNS = 0x00020000

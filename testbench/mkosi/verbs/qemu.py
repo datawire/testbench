@@ -12,6 +12,7 @@ from ..ui import die
 
 NEEDS_ROOT = False
 NEEDS_BUILD = True
+HAS_ARGS = True
 FORCE_UNLINKS = True
 
 def print_running_cmd(cmdline: Iterable[str]) -> None:
