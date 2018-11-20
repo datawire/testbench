@@ -60,6 +60,7 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 # easiest way to get quoting right.
 export CMD
 %.tap %.tap.osi: %.osi %.knaut FORCE
+	rm -f -- $@ $@.osi
 	cp -T -- $*.osi $@.osi
 	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup sh -c "$$CMD"
 	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu -name $@.osi
