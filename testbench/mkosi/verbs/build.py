@@ -182,6 +182,63 @@ def copy(oldpath: str, newpath: str) -> None:
                 continue
     shutil.copystat(oldpath, newpath, follow_symlinks=True)
 
+# Kinda like Bash <<-'EOT' here-docs
+def trim(s: str) -> str:
+    return "\n".join([line.lstrip("\t ") for line in s.lstrip("\n").split("\n")])
+
+
+def write(fname: str, content: str, mode: int = 0o644) -> None:
+    with open(fname, 'wt') as file:
+        file.write(trim(content))
+    os.chmod(fname, mode)
+
+
+def setup_testbench(args: CommandLineArguments, workspace: str) -> None:
+    mountpoint = os.path.join(workspace, "root")
+
+    run_workspace_command(args, workspace,
+                          "useradd",
+                          "--create-home",
+                          "--comment", "testbench runner",
+                          "--groups", "users",
+                          "testbench")
+    # Some distros lock new accounts by default (probably smart), make
+    # sure testbench is unlocked.
+    run_workspace_command(args, workspace,
+                          "passwd", "--delete", "testbench")
+
+    write(os.path.join(mountpoint, 'etc/sudoers.d/00-testbench'), """
+        # SUDO_USERS HOSTS=(AS_USER) TAGS COMMANDS
+        testbench ALL=(ALL) NOPASSWD: ALL
+        """)
+
+    write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target'), """
+        [Unit]
+        Description=testbench-run target
+        Requires=multi-user.target
+        After=multi-user.target
+        Conflicts=rescue.target
+        AllowIsolate=yes
+        Wants=testbench-run.service
+        """)
+    symlink_f('testbench-run.target', os.path.join(mountpoint, 'etc/systemd/system/default.target'))
+
+    write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.service'), """
+        [Unit]
+        Description=testbench-run service
+        Wants=network-online.target
+        After=network-online.target
+        ConditionFileIsExecutable=/etc/testbench-run
+
+        [Service]
+        User=testbench
+        WorkingDirectory=/home/testbench/src
+        ExecStart=/etc/testbench-run
+        StandardOutput=file:/var/log/testbench-run.tap
+        StandardError=journal+console
+        ExecStopPost=+/bin/sh -c 'mv -Tf /etc/testbench-run /etc/testbench-run.bak; systemctl poweroff --no-block'
+        """)
+
 @complete_step('Detaching namespace')
 def init_namespace(args: CommandLineArguments) -> None:
     args.original_umask = os.umask(0o000)
@@ -795,15 +852,18 @@ def install_build_src(args: CommandLineArguments, workspace: str, run_build_scri
             if use_git:
                 copy_git_files(args.build_sources, target, git_files=args.git_files)
             else:
-                ignore = shutil.ignore_patterns('.git',
+                ignore = shutil.ignore_patterns(#'.git',
                                                 'environments',
                                                 '.mkosi-*',
                                                 '*.cache-pre-dev',
                                                 '*.cache-pre-inst',
-                                                os.path.basename(args.output_dir)+"/" if args.output_dir else "mkosi.output/",
-                                                os.path.basename(args.cache_path)+"/" if args.cache_path else "mkosi.cache/",
-                                                os.path.basename(args.build_dir)+"/" if args.build_dir else "mkosi.builddir/")
+                                                os.path.basename(args.output_dir) if args.output_dir else "mkosi.output",
+                                                os.path.basename(args.cache_path) if args.cache_path else "mkosi.cache",
+                                                os.path.basename(args.build_dir) if args.build_dir else "mkosi.builddir")
                 shutil.copytree(args.build_sources, target, symlinks=True, ignore=ignore)
+            run_workspace_command(args, workspace,
+                                  "chown", "-R", "testbench:", "/home/testbench/src")
+
 
 def install_build_dest(args: CommandLineArguments, workspace: str, run_build_script: bool, for_cache: bool) -> None:
     if run_build_script:
@@ -1373,6 +1433,7 @@ def build_image(args: CommandLineArguments, workspace: str, run_build_script: bo
                     install_build_src(args, workspace, run_build_script, for_cache)
                     install_build_dest(args, workspace, run_build_script, for_cache)
                     set_root_password(args, workspace, run_build_script, for_cache)
+                    setup_testbench(args, workspace)
                     run_postinst_script(args, workspace, run_build_script, for_cache)
 
                 reset_machine_id(workspace, run_build_script, for_cache)

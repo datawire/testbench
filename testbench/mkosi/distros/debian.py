@@ -30,8 +30,8 @@ def debootstrap(args: CommandLineArguments, workspace: str, run_build_script: bo
     # Debian moronically doesn't like nss-myhostname, which means that
     # Debian installs are Broken By Default™.
     with open(os.path.join(workspace, "root/etc/hosts"), "w") as f:
-        f.writelines(["127.0.0.1  localhost",
-                      "::1        localhost"])
+        f.writelines(["127.0.0.1  localhost localhost.localdomain\n",
+                      "::1        localhost localhost.localdomain\n"])
 
     # Work around debian bug #835628
     os.makedirs(os.path.join(workspace, "root/etc/dracut.conf.d"), exist_ok=True)

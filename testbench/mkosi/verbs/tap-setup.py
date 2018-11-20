@@ -23,82 +23,20 @@ NEEDS_BUILD = True
 HAS_ARGS = True
 FORCE_UNLINKS = True
 
-# Kinda like Bash <<-'EOT' here-docs
-def trim(s: str) -> str:
-    return "\n".join([line.lstrip("\t ") for line in s.lstrip("\n").split("\n")])
-
-
-def write(fname: str, content: str, mode: int = 0o644) -> None:
-    with open(fname, 'wt') as file:
-        file.write(trim(content))
-    os.chmod(fname, mode)
-
-
 def setup(args: CommandLineArguments, workspace: str, mountpoint: str) -> None:
-    run_workspace_command(args, workspace,
-                          "useradd",
-                          "--create-home",
-                          "--comment", "testbench runner",
-                          "--groups", "users",
-                          "testbench")
-    # Some distros lock new accounts by default (probably smart), make
-    # sure testbench is unlocked.
-    run_workspace_command(args, workspace,
-                          "passwd", "--delete", "testbench")
+    with open(os.path.join(mountpoint, 'etc/testbench-run'), 'w') as f:
+        f.writelines(["#!/bin/sh\n",
+                      " ".join(shlex.quote(arg) for arg in args.cmdline)+"\n"])
+    os.chmod(os.path.join(mountpoint, 'etc/testbench-run'), 0o755)
 
-    write(os.path.join(mountpoint, 'etc/sudoers.d/00-testbench'), """
-        # SUDO_USERS HOSTS=(AS_USER) TAGS COMMANDS
-        testbench ALL=(ALL) NOPASSWD: ALL
-        """)
-
-    write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target'), """
-        [Unit]
-        Description=testbench-run target
-        Requires=multi-user.target
-        After=multi-user.target
-        Conflicts=rescue.target
-        AllowIsolate=yes
-        """)
-    os.symlink('testbench-run.target', os.path.join(mountpoint, 'etc/systemd/system/default.target'))
-
-    write(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.service'), """
-        [Unit]
-        Description=testbench-run service
-        Wants=network-online.target
-        After=network-online.target
-        ConditionFileIsExecutable=/etc/testbench-run
-
-        [Service]
-        User=testbench
-        WorkingDirectory=/home/testbench/src
-        ExecStart=/etc/testbench-run
-        StandardOutput=file:/var/log/testbench-run.tap
-        ExecStopPost=+/bin/sh -c 'rm -f /etc/testbench-run; systemctl poweroff --no-block'
-
-        [Install]
-        WantedBy=testbench-run.target
-        """)
-    # systemctl enable tesbtench-run.service
-    try:
-        os.mkdir(os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target.wants'), mode=0o755)
-    except FileExistsError:
-        pass
-    os.symlink('../testbench-run.service', os.path.join(mountpoint, 'etc/systemd/system/testbench-run.target.wants/testbench-run.service'))
-
-    write(os.path.join(mountpoint, 'etc/testbench-run'),
-          "#!/bin/sh\n" + " ".join(shlex.quote(arg) for arg in args.cmdline)+"\n",
-          mode=0o755)
-
-    try:
-        os.mkdir(os.path.join(mountpoint, 'home/testbench/.kube'), mode=0o755)
-    except FileExistsError:
-        pass
+    os.makedirs(os.path.join(mountpoint, 'home/testbench/.kube'), mode=0o755)
     shutil.copy(args.output[:-8]+".knaut",
                 os.path.join(mountpoint, "home/testbench/.kube/config"))
 
     install_build_src(args, workspace, True, False)
+
     run_workspace_command(args, workspace,
-                          "chown", "-R", "testbench:", "/home/testbench/src")
+                          "chown", "-R", "testbench:", "/home/testbench")
 
 def do_inner(args: CommandLineArguments) -> None:
     args.machine_id = uuid.uuid4().hex

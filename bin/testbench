@@ -56,11 +56,15 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 	  $(if $(wildcard $*.postinst),--postinst-script=$*.postinst) \
 	  $(if $(wildcard $*.extra),--extra-tree=$*.extra)
 
+# exporting CMD, then having Bash (rather than Make) expand it is the
+# easiest way to get quoting right.
+export CMD
 %.tap %.tap.osi: %.osi %.knaut FORCE
 	cp -T -- $*.osi $@.osi
-	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup $(CMD)
-	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu
+	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup sh -c "$$CMD"
+	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu -name $@.osi
 	$(MKOSI) --output=$@.osi --default=$*.mkosi tap-teardown
+	$(MAKE) %.knaut.clean
 .PRECIOUS: %.tap.osi
 
 mkosi.cache:
