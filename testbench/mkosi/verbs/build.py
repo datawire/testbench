@@ -844,7 +844,8 @@ def install_build_src(args: CommandLineArguments, workspace: str, run_build_scri
         #          os.path.join(workspace, "root", "root", os.path.basename(args.build_script)))
 
         if args.build_sources is not None:
-            target = os.path.join(workspace, "root", "home/testbench/src")
+            _target = os.path.join(workspace, "root", "home/testbench/src")
+            target = os.path.join(workspace, "root")+os.path.abspath(args.build_sources)
             use_git = args.use_git_files
             if use_git is None:
                 use_git = os.path.exists('.git') or os.path.exists(os.path.join(args.build_sources, '.git'))
@@ -861,8 +862,10 @@ def install_build_src(args: CommandLineArguments, workspace: str, run_build_scri
                                                 os.path.basename(args.cache_path) if args.cache_path else "mkosi.cache",
                                                 os.path.basename(args.build_dir) if args.build_dir else "mkosi.builddir")
                 shutil.copytree(args.build_sources, target, symlinks=True, ignore=ignore)
+            if target != _target:
+                symlink_f(os.path.abspath(args.build_sources), _target)
             run_workspace_command(args, workspace,
-                                  "chown", "-R", "testbench:", "/home/testbench/src")
+                                  "chown", "-R", "testbench:", os.path.abspath(args.build_sources))
 
 
 def install_build_dest(args: CommandLineArguments, workspace: str, run_build_script: bool, for_cache: bool) -> None:
