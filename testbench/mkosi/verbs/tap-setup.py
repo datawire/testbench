@@ -60,7 +60,7 @@ def do(args: CommandLineArguments) -> None:
     # Normalize
     dirs = [os.path.abspath(d) for d in dirs if d is not None]
     # Filter duplicates/subdirs
-    dirs = [x for x in dirs if not any(x.startswith(y+'/') for y in dirs)]
+    dirs = set(x for x in dirs if not any(x.startswith(y+'/') for y in dirs))
 
     run_in_docker(do_inner, [args], docker_args=[
         "--privileged",  # needs to (1) have access to loop devices, (2) be able to mount things
