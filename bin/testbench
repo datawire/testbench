@@ -56,13 +56,10 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 	  $(if $(wildcard $*.postinst),--postinst-script=$*.postinst) \
 	  $(if $(wildcard $*.extra),--extra-tree=$*.extra)
 
-# exporting CMD, then having Bash (rather than Make) expand it is the
-# easiest way to get quoting right.
-export CMD
 %.tap %.tap.osi: %.osi %.knaut FORCE
 	rm -f -- $@ $@.osi
 	cp -T -- $*.osi $@.osi
-	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup sh -c "$$CMD"
+	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup sh -c '$(call escape_squotes,$(value CMD))'
 	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu -name $@.osi
 	$(MKOSI) --output=$@.osi --default=$*.mkosi tap-teardown
 	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) $*.knaut.clean
@@ -70,3 +67,8 @@ export CMD
 
 mkosi.cache:
 	mkdir mkosi.cache
+
+# I put this as the last line in the file because it confuses Emacs
+# syntax highlighting and makes the remainder of the file difficult to
+# edit.
+escape_squotes = $(subst ','\'',$1)
