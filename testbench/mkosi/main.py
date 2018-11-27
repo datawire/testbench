@@ -10,8 +10,8 @@ from .types import CommandLineArguments
 from .ui import complete_step
 from .utils import check_root, empty_directory, unlink_try_hard
 
-if sys.version_info < (3, 5):
-    sys.exit("Sorry, we need at least Python 3.5.")
+if sys.version_info < (3, 6):
+    sys.exit("Sorry, we need at least Python 3.6.")
 
 # TODO
 # - volatile images
