@@ -13,16 +13,20 @@ TAIL = pkgutil.get_data(__package__, 'tail.html').decode('utf-8')
 def html_escape(i: str, quote: bool) -> str:
     return html.escape(i, quote=quote)
 
+erred = False
 
 def print_cell(s: TestStatus) -> None:
-    classes, text = {
-        TestStatus.OK: ("ok", "✔"),
-        TestStatus.NOT_OK: ("not_ok", "✘"),
-        TestStatus.TODO_OK: ("todo_ok", "✔"),
-        TestStatus.TODO_NOT_OK: ("todo_not_ok", "✘"),
-        TestStatus.SKIP: ("skip", "-"),
-        TestStatus.MISSING: ("missing", "❗"),
+    global erred
+    classes, text, passed = {
+        TestStatus.OK: ("ok", "✔", True),
+        TestStatus.NOT_OK: ("not_ok", "✘", False),
+        TestStatus.TODO_OK: ("todo_ok", "✔", True),
+        TestStatus.TODO_NOT_OK: ("todo_not_ok", "✘", True),
+        TestStatus.SKIP: ("skip", "-", True),
+        TestStatus.MISSING: ("missing", "❗", False),
     }[s]
+    if not passed:
+        erred = True
     print('    <td class="%s">%s</td>' % (classes, text))
 
 
@@ -97,3 +101,4 @@ def main() -> None:
         print("</pre>")
     # End document
     print(TAIL)
+    print("<!-- exit: {} -->".format(1 if erred else 0))

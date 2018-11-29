@@ -19,6 +19,7 @@ all: run
 
 run: testbench.html
 	test -z "$$DISPLAY" || python3 -c 'import webbrowser; webbrowser.open_new("./testbench.html")'
+	exit $$(sed -rn 's/.*<!-- exit: ([0-9]+) -->.*/\1/p' -- $<)
 .PHONY: run
 
 testbench.html: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
