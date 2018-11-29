@@ -60,7 +60,7 @@ prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 	rm -f -- $@ $@.osi
 	cp -T -- $*.osi $@.osi
 	$(MKOSI) --output=$@.osi --default=$*.mkosi --build-sources=$$PWD --use-git-files=no tap-setup sh -c '$(call escape_squotes,$(value CMD))'
-	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu -name $@.osi
+	$(MKOSI) --output=$@.osi --default=$*.mkosi qemu -name $@.osi $(if $(DISPLAY),,-nographic)
 	$(MKOSI) --output=$@.osi --default=$*.mkosi tap-teardown
 #	$(MAKE) -f $(firstword $(MAKEFILE_LIST)) $*.knaut.clean
 .PRECIOUS: %.tap.osi
