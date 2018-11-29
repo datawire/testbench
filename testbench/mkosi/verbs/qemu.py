@@ -53,6 +53,8 @@ def do(args: CommandLineArguments) -> None:
     # they’ll correspond to the current architecture, thanks to the package manager.
     FIRMWARE_LOCATIONS.append('/usr/share/edk2/ovmf/OVMF_CODE.fd')
     FIRMWARE_LOCATIONS.append('/usr/share/qemu/OVMF_CODE.fd')
+    FIRMWARE_LOCATIONS.append('/usr/share/ovmf/OVMF.fd')
+    FIRMWARE_LOCATIONS.append('/usr/share/qemu/OVMF.fd')
 
     for firmware in FIRMWARE_LOCATIONS:
         if os.path.exists(firmware):
