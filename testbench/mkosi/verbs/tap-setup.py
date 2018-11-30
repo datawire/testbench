@@ -35,6 +35,13 @@ def setup(args: CommandLineArguments, workspace: str, mountpoint: str) -> None:
 
     install_build_src(args, workspace, True, False)
 
+    for cachedir in [os.path.join("/", d) for d in args.runcache]:
+        host = args.output[:-8]+".cache"+cachedir
+        guest = mountpoint+cachedir
+        if os.path.exists(host):
+            os.makedirs(os.path.dirname(guest))
+            shutil.copytree(host, guest)
+
     run_workspace_command(args, workspace,
                           "chown", "-R", "testbench:", "/home/testbench")
 

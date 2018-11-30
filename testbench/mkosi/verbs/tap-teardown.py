@@ -18,6 +18,12 @@ def do_inner(args: CommandLineArguments) -> None:
     with osi_mount(args) as mountpoint:
         shutil.copyfile(os.path.join(mountpoint, "var/log/testbench-run.tap"),
                         args.output[:-4])  # .tap.osi → .tap
+        for cachedir in [os.path.join("/", d) for d in args.runcache]:
+            host = args.output[:-8]+".cache"+cachedir
+            guest = mountpoint+cachedir
+            if os.path.exists(guest):
+                os.makedirs(os.path.dirname(host))
+                shutil.copytree(guest, host)
 
 def do(args: CommandLineArguments) -> None:
     assert args.output.endswith(".tap.osi")

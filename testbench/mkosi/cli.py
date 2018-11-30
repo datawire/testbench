@@ -79,6 +79,7 @@ def parse_args() -> CommandLineArguments:
     group.add_argument("--xz", action='store_true', help='Compress resulting image with xz (only raw_ext4, raw_btrfs, raw_squashfs, raw_xfs, implied on tar)')
     group.add_argument("--qcow2", action='store_true', help='Convert resulting image to qcow2 (only raw_ext4, raw_btrfs, raw_squashfs, raw_xfs)')
     group.add_argument('-i', "--incremental", action='store_true', help='Make use of and generate intermediary cache images')
+    group.add_argument("--runcache", action=CommaDelimitedListAction, dest='runcache', default=[], help='Cache these directories between runs')
 
     group = parser.add_argument_group("Packages")
     group.add_argument('-p', "--package", action=CommaDelimitedListAction, dest='packages', default=[], help='Add an additional package to the OS image', metavar='PACKAGE')
@@ -288,6 +289,9 @@ def process_setting(args: CommandLineArguments, section: str, key: Optional[str]
         elif key == "Hostname":
             if not args.hostname:
                 args.hostname = value
+        elif key == "Cache":
+            list_value = value if type(value) == list else value.split()
+            args.runcache.extend(list_value)
         elif key is None:
             return True
         else:
