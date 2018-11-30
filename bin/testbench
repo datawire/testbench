@@ -7,15 +7,14 @@ HOME ?= ~
 
 #
 
+ifneq ($(filter %.tap %.tap.osi testbench.html run,$(or $(MAKECMDGOALS),run)),)
 ifeq ($(CMD),)
 $(error Must specify a CMD=)
+endif
 endif
 ifeq ($(wildcard environments/*.mkosi),)
 $(error Must define environments in ./environments/*.mkosi)
 endif
-
-all: run
-.PHONY: all
 
 run: testbench.html
 	test -z "$$DISPLAY" || python3 -c 'import webbrowser; webbrowser.open_new("./testbench.html")'
