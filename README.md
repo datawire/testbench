@@ -4,7 +4,7 @@
 
 Requirements:
 
- - Python 3.5 or better
+ - Python 3.6 or better
  - Python setuptools
  - QEMU
  - Docker
