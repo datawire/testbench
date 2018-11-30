@@ -27,6 +27,9 @@ testbench.html: $(patsubst %.mkosi,%.tap,$(wildcard environments/*.mkosi))
 prepare: $(patsubst %.mkosi,%.osi,$(wildcard environments/*.mkosi))
 .PHONY: prepare
 
+delete-claims: $(addsuffix .clean,$(wildcard environments/*.knaut))
+.PHONY: delete-claims
+
 # Set Make's behavior to do the sane thing
 .SECONDARY:
 .DELETE_ON_ERROR:
