@@ -18,6 +18,7 @@ def do_inner(args: CommandLineArguments) -> None:
     with osi_mount(args) as mountpoint:
         shutil.copyfile(os.path.join(mountpoint, "var/log/testbench-run.tap"),
                         args.output[:-4])  # .tap.osi → .tap
+        shutil.rmtree(args.output[:-8]+".cache", ignore_errors=True)
         for cachedir in [os.path.join("/", d) for d in args.runcache]:
             host = args.output[:-8]+".cache"+cachedir
             guest = mountpoint+cachedir
