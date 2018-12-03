@@ -45,6 +45,20 @@ def setup(args: CommandLineArguments, workspace: str, mountpoint: str) -> None:
     run_workspace_command(args, workspace,
                           "chown", "-R", "testbench:", "/home/testbench")
 
+    if os.path.exists(args.output[:-8]+".pre-run"):
+        shutil.copy(args.output[:-8]+".pre-run",
+                    os.path.join(mountpoint, "etc/testbench-pre-run"))
+        run_workspace_command(args, workspace,
+                              "sudo", "-u", "testbench", "sh", "-c",
+                              "cd ~/src && /etc/testbench-pre-run",
+                              network=True)
+    else:
+        try:
+            os.unlink(os.path.join(mountpoint, "etc/testbench-pre-run"))
+        except:
+            pass
+
+
 def do_inner(args: CommandLineArguments) -> None:
     args.machine_id = uuid.uuid4().hex
     init_namespace(args)
