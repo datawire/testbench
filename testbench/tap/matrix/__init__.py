@@ -75,11 +75,21 @@ def main() -> None:
     print("  </tr>")
     # Print whether there are problems with this TAP
     print("  <tr>")
-    print("    <th>Tests suite ran OK</th>")
+    print("    <th>Tests suite ran</th>")
     for filename in filenames:
         ok = (
             (len(file_errs[filename]) == 0) and
             all(tc.status != TestStatus.MISSING for tc in file_cases[filename].values())
+        )
+        print_cell(TestStatus.OK if ok else TestStatus.NOT_OK)
+    print("  </tr>")
+    # Print the test suite status
+    print("  <tr>")
+    print("    <th>Tests suite passed</th>")
+    for filename in filenames:
+        ok = (
+            (len(file_errs[filename]) == 0) and
+            all(tc.status != TestStatus.MISSING and tc.status != TestStatus.NOT_OK for tc in file_cases[filename].values())
         )
         print_cell(TestStatus.OK if ok else TestStatus.NOT_OK)
     print("  </tr>")
