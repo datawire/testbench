@@ -27,12 +27,6 @@ def debootstrap(args: CommandLineArguments, workspace: str, run_build_script: bo
 
     run_visible(cmdline, check=True)
 
-    # Debian moronically doesn't like nss-myhostname, which means that
-    # Debian installs are Broken By Default™.
-    with open(os.path.join(workspace, "root/etc/hosts"), "w") as f:
-        f.writelines(["127.0.0.1  localhost localhost.localdomain\n",
-                      "::1        localhost localhost.localdomain\n"])
-
     # Work around debian bug #835628
     os.makedirs(os.path.join(workspace, "root/etc/dracut.conf.d"), exist_ok=True)
     with open(os.path.join(workspace, "root/etc/dracut.conf.d/99-generic.conf"), "w") as f:
@@ -87,7 +81,7 @@ def install(args: CommandLineArguments, workspace: str, run_build_script: bool) 
     # Debootstrap is not smart enough to deal correctly with alternative dependencies
     # Installing libpam-systemd via debootstrap results in systemd-shim being installed
     # Therefore, prefer to install via apt from inside the container
-    packages = [ 'dbus', 'libpam-systemd']
+    packages = [ 'dbus', 'libpam-systemd', 'libnss-myhostname']
     packages.extend(args.packages)
     if run_build_script:
         packages.extend(args.build_packages)
